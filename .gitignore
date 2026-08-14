@@ -1,0 +1,72 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Pp]ublish/
+TestResults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+*.trx
+*.nupkg
+*.snupkg
+
+# Visual Studio, Visual Studio Code, and JetBrains
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+_ReSharper*/
+*.DotSettings.user
+
+# .NET tooling
+project.lock.json
+project.fragment.lock.json
+artifacts.json
+BenchmarkDotNet.Artifacts/
+.packages/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+# Signing keys and provisioning profiles
+*.keystore
+*.jks
+*.pfx
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.key
+
+# Runtime data, logs, and diagnostics
+*.jsonl
+*.log
+logs/
+*.dmp
+*.mdmp
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~

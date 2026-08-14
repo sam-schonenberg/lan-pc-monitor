@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PCMonitor.Service/PCMonitor.Service.csproj" />
+  <Project Path="LanPcMonitor.Tray/LanPcMonitor.Tray.csproj" />
+  <Project Path="PCMonitor.Service.Tests/PCMonitor.Service.Tests.csproj" />
+  <Project Path="PCMonitor.Application/PCMonitor.Application.csproj" />
+</Solution>

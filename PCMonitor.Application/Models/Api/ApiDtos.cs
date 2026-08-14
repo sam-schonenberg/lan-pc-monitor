@@ -1,0 +1,13 @@
+using System.Text.Json;
+namespace PCMonitor.Application.Models.Api;
+public sealed record ServiceStatusDto(string Status, string Service, string MachineName, DateTimeOffset Timestamp);
+public sealed record SensorReadingDto(string Id, string Hardware, string Name, string Type, float? Value, string? Unit);
+public sealed record SensorSnapshotDto(DateTimeOffset Timestamp, IReadOnlyList<SensorReadingDto> Sensors);
+public sealed record HistoricalSensorReadingDto(string Id, string Hardware, string Name, string Type, string? Unit, float Min, float Max, double Average, long SampleCount);
+public sealed record HistoricalProcessSummaryDto(string Name, double AverageCpuPercent, double MaxCpuPercent, long SampleCount);
+public sealed record HistoricalSnapshotDto(DateTimeOffset StartTime, DateTimeOffset EndTime, IReadOnlyList<HistoricalSensorReadingDto> Sensors, Guid? SessionId, HistoricalProcessSummaryDto? DominantProcess);
+public sealed record HistoricalHistoryResponseDto(DateTimeOffset? From, DateTimeOffset? To, int ResolutionSeconds, IReadOnlyList<HistoricalSnapshotDto> Snapshots);
+public sealed record MonitorAlertDto(Guid Id, DateTimeOffset Timestamp, string Severity, string SensorId, string Hardware, string SensorName, string SensorType, double Value, double Threshold, string? Unit, string Message);
+public sealed record AlertHistoryResponseDto(DateTimeOffset? From, DateTimeOffset? To, IReadOnlyList<MonitorAlertDto> Alerts);
+public sealed record SessionStatusDto(string State, JsonElement? Session);
+public sealed record LiveEventEnvelopeDto(string Type, JsonElement Data);
