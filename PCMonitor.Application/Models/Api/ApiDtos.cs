@@ -7,6 +7,19 @@ public sealed record HistoricalSensorReadingDto(string Id, string Hardware, stri
 public sealed record HistoricalProcessSummaryDto(string Name, double AverageCpuPercent, double MaxCpuPercent, long SampleCount);
 public sealed record HistoricalSnapshotDto(DateTimeOffset StartTime, DateTimeOffset EndTime, IReadOnlyList<HistoricalSensorReadingDto> Sensors, Guid? SessionId, HistoricalProcessSummaryDto? DominantProcess);
 public sealed record HistoricalHistoryResponseDto(DateTimeOffset? From, DateTimeOffset? To, int ResolutionSeconds, IReadOnlyList<HistoricalSnapshotDto> Snapshots);
+public sealed record SensorCatalogEntryDto(int Id, string Key, string Hardware, string Name, string Type, string? Unit);
+public sealed record SensorCatalogResponseDto(string Version, IReadOnlyList<SensorCatalogEntryDto> Sensors);
+public sealed record CompactHistoricalSensorDto(int SensorId, double Min, double Max, double Avg, long Count);
+public sealed record CompactHistoricalSnapshotDto(long Sequence, DateTimeOffset StartTime, DateTimeOffset EndTime,
+    IReadOnlyList<CompactHistoricalSensorDto> Sensors, Guid? SessionId, HistoricalProcessSummaryDto? DominantProcess);
+public sealed record CompactHistoryResponseDto(string CatalogVersion, string Resolution, long? FromSequence,
+    long? ToSequence, bool HasMore, long? NextSequence, IReadOnlyList<CompactHistoricalSnapshotDto> Snapshots,
+    long? AvailableToSequence = null, int RemainingBuckets = 0, long? PreviousSequence = null);
+public sealed record HistorySequenceRangeDto(long FromSequence, long ToSequence, int BucketCount);
+public sealed record HistoryManifestResponseDto(Guid StreamId, string CatalogVersion, long? OldestSequence,
+    long? NewestSequence, int BucketCount, DateTimeOffset? OldestTimestamp, DateTimeOffset? NewestTimestamp,
+    int ResolutionSeconds, double RetentionHours, IReadOnlyList<HistorySequenceRangeDto> SequenceRanges,
+    DateTimeOffset GeneratedAt);
 public sealed record MonitorAlertDto(Guid Id, DateTimeOffset Timestamp, string Severity, string SensorId, string Hardware, string SensorName, string SensorType, double Value, double Threshold, string? Unit, string Message);
 public sealed record AlertHistoryResponseDto(DateTimeOffset? From, DateTimeOffset? To, IReadOnlyList<MonitorAlertDto> Alerts);
 public sealed record SessionStatusDto(string State, JsonElement? Session);

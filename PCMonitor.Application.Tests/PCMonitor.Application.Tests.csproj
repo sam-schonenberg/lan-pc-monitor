@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\PCMonitor.Application\Data\AppDatabase.cs" Link="Application\AppDatabase.cs" />
+    <Compile Include="..\PCMonitor.Application\Data\DatabaseConstants.cs" Link="Application\DatabaseConstants.cs" />
+    <Compile Include="..\PCMonitor.Application\Data\Entities\*.cs" Link="Application\Entities\%(Filename)%(Extension)" />
+    <Compile Include="..\PCMonitor.Application\Models\Api\ApiDtos.cs" Link="Application\ApiDtos.cs" />
+    <Compile Include="..\PCMonitor.Application\Models\SensorChartPoint.cs" Link="Application\SensorChartPoint.cs" />
+    <Compile Include="..\PCMonitor.Application\Models\DashboardWidgets.cs" Link="Application\DashboardWidgets.cs" />
+    <Compile Include="..\PCMonitor.Application\Models\DashboardWidgetLayout.cs" Link="Application\DashboardWidgetLayout.cs" />
+    <Compile Include="..\PCMonitor.Application\Services\Storage\HistoryRepository.cs" Link="Application\HistoryRepository.cs" />
+    <Compile Include="..\PCMonitor.Application\Services\Storage\DashboardWidgetRepository.cs" Link="Application\DashboardWidgetRepository.cs" />
+    <Compile Include="..\PCMonitor.Application\Services\Storage\AlertRepository.cs" Link="Application\AlertRepository.cs" />
+  </ItemGroup>
+</Project>

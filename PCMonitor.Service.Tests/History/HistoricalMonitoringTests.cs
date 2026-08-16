@@ -111,6 +111,128 @@ public sealed class HistoricalMonitoringTests : IDisposable
         Assert.NotNull(snapshot);
         Assert.Null(snapshot.SessionId);
         Assert.Null(snapshot.DominantProcess);
+        Assert.Equal(0, snapshot.Sequence);
+    }
+
+    [Fact]
+    public void AssignsMonotonicSequencesAndPagesByCursor()
+    {
+        var (store, _) = CreateSystem();
+        for (var index = 0; index < 1000; index++)
+            store.Add(Historical(_now.AddMinutes(index), "sensor"));
+
+        var first = store.QueryCompact(null, null, null, 500, HistoryResolution.Minute, null);
+        Assert.Equal(500, first.Snapshots.Count);
+        Assert.True(first.HasMore);
+        Assert.Equal(1, first.FromSequence);
+        Assert.Equal(500, first.NextSequence);
+
+        var second = store.QueryCompact(null, null, first.NextSequence, 500, HistoryResolution.Minute, null);
+        Assert.Equal(500, second.Snapshots.Count);
+        Assert.False(second.HasMore);
+        Assert.Equal(501, second.FromSequence);
+        Assert.Equal(1000, second.ToSequence);
+    }
+
+    [Fact]
+    public void ReverseCursorReturnsNewestBucketsFirstWithoutCrossingGapBoundary()
+    {
+        var (store, _) = CreateSystem();
+        for (var index = 0; index < 100; index++)
+            store.Add(Historical(_now.AddMinutes(index), "sensor"));
+
+        var newestPage = store.QueryCompact(null, null, 39, 20, HistoryResolution.Minute,
+            null, null, 81);
+
+        Assert.Equal(20, newestPage.Snapshots.Count);
+        Assert.Equal(80, newestPage.Snapshots[0].Sequence);
+        Assert.Equal(61, newestPage.Snapshots[^1].Sequence);
+        Assert.Equal(61, newestPage.PreviousSequence);
+        Assert.True(newestPage.HasMore);
+        Assert.All(newestPage.Snapshots, x => Assert.InRange(x.Sequence, 40, 80));
+    }
+
+    [Fact]
+    public void RecoveryContinuesAfterHighestSequenceAndUpgradesLegacyRecords()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "history.jsonl");
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        File.WriteAllLines(path,
+        [
+            JsonSerializer.Serialize(Historical(_now.AddMinutes(-2), "legacy"), json),
+            JsonSerializer.Serialize(Historical(_now.AddMinutes(-1), "existing") with { Sequence = 41 }, json)
+        ]);
+        var store = CreateStore(path, 24);
+        store.Add(Historical(_now, "new"));
+
+        var records = store.Query(null, null, null).Snapshots;
+        Assert.All(records, x => Assert.True(x.Sequence > 0));
+        Assert.Equal(43, records.Single(x => x.Sensors[0].Id == "new").Sequence);
+    }
+
+    [Fact]
+    public void HourAggregationUsesWeightedAverageAndClockBoundaries()
+    {
+        var (store, _) = CreateSystem();
+        var first = _now.Date.AddHours(14);
+        store.Add(new HistoricalSnapshot(first, first.AddMinutes(1),
+            [new("sensor", "Hardware", "Sensor", "Load", "%", 40, 60, 50, 60)]));
+        store.Add(new HistoricalSnapshot(first.AddMinutes(59), first.AddHours(1),
+            [new("sensor", "Hardware", "Sensor", "Load", "%", 90, 110, 100, 10)]));
+        store.Add(new HistoricalSnapshot(first.AddHours(1), first.AddHours(1).AddMinutes(1),
+            [new("sensor", "Hardware", "Sensor", "Load", "%", 5, 6, 5, 1)]));
+
+        var result = store.QueryCompact(null, null, null, 500, HistoryResolution.Hour, null);
+        Assert.Equal(2, result.Snapshots.Count);
+        var aggregate = result.Snapshots[0];
+        Assert.Equal(first, aggregate.StartTime);
+        Assert.Equal(40, aggregate.Sensors[0].Min);
+        Assert.Equal(110, aggregate.Sensors[0].Max);
+        Assert.Equal(57.1, aggregate.Sensors[0].Avg);
+        Assert.Equal(70, aggregate.Sensors[0].Count);
+    }
+
+    [Fact]
+    public void CatalogContainsEveryCompactHistorySensorId()
+    {
+        var (store, _) = CreateSystem();
+        store.Add(new HistoricalSnapshot(_now, _now.AddMinutes(1), [Reading("cpu", 10), Reading("gpu", 20)]));
+        var catalog = store.GetCatalog();
+        var ids = catalog.Sensors.Select(x => x.Id).ToHashSet();
+        var history = store.QueryCompact(null, null, null, 500, HistoryResolution.Minute, null);
+        Assert.NotEmpty(catalog.Version);
+        Assert.All(history.Snapshots.SelectMany(x => x.Sensors), x => Assert.Contains(x.SensorId, ids));
+    }
+
+    [Fact]
+    public void ManifestReportsRetainedCoverageAndSequenceGaps()
+    {
+        var (store, _) = CreateSystem();
+        store.Add(Historical(_now.AddMinutes(-3), "sensor") with { Sequence = 10 });
+        store.Add(Historical(_now.AddMinutes(-2), "sensor") with { Sequence = 11 });
+        store.Add(Historical(_now.AddMinutes(-1), "sensor") with { Sequence = 14 });
+
+        var manifest = store.GetManifest();
+        Assert.NotEqual(Guid.Empty, manifest.StreamId);
+        Assert.Equal(10, manifest.OldestSequence);
+        Assert.Equal(14, manifest.NewestSequence);
+        Assert.Equal(3, manifest.BucketCount);
+        Assert.Equal(2, manifest.SequenceRanges.Count);
+        Assert.Equal(new HistorySequenceRange(10, 11, 2), manifest.SequenceRanges[0]);
+        Assert.Equal(new HistorySequenceRange(14, 14, 1), manifest.SequenceRanges[1]);
+    }
+
+    [Fact]
+    public void ManifestStreamIdentitySurvivesRestart()
+    {
+        var path = Path.Combine(_directory, "history.jsonl");
+        var first = CreateStore(path, 24);
+        first.Add(Historical(_now.AddMinutes(-1), "sensor"));
+        var streamId = first.GetManifest().StreamId;
+
+        var restored = CreateStore(path, 24);
+        Assert.Equal(streamId, restored.GetManifest().StreamId);
     }
 
     private (HistoricalHistoryStore Store, HistoricalSensorAggregator Aggregator) CreateSystem(double retentionHours = 24)

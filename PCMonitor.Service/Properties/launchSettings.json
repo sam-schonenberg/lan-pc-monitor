@@ -1,12 +1,13 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
     "PCMonitor.Service": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
+      "launchBrowser": true,
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
-      }
+      },
+      "dotnetRunMessages": true
     }
-  }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
 }

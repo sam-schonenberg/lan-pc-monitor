@@ -4,7 +4,8 @@ namespace PCMonitor.Application.Data.Entities;
 public sealed class AlertEntity
 {
     [PrimaryKey] public string Id { get; set; } = string.Empty;
-    [Indexed] public DateTimeOffset Timestamp { get; set; }
+    [Indexed] public long TimestampUtcTicks { get; set; }
+    [Ignore] public DateTimeOffset Timestamp => new(TimestampUtcTicks, TimeSpan.Zero);
     public string Severity { get; set; } = string.Empty;
     public string SensorId { get; set; } = string.Empty;
     public string SensorName { get; set; } = string.Empty;

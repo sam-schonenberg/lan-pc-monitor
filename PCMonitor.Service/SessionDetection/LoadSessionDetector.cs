@@ -298,7 +298,7 @@ public sealed class LoadSessionDetector
                 Percent(source.StartCpuLoadPercent, 40),
                 Percent(source.StartGpuLoadPercent, 40),
                 Duration(source.StartWindowSeconds, 10),
-                Duration(source.StartDurationSeconds, 10),
+                Duration(source.StartDurationSeconds, 30),
                 Percent(source.EndCpuLoadPercent, 20),
                 Percent(source.EndGpuLoadPercent, 20),
                 Duration(source.EndWindowSeconds, 30),

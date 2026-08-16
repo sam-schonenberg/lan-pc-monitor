@@ -53,6 +53,7 @@ public sealed class HistoricalSensorAggregator
         HistoricalSnapshot? finalized = null;
         try
         {
+            _history.RegisterSensors(snapshot.Sensors);
             lock (_sync)
             {
                 var incomingStart = Align(snapshot.Timestamp, _bucketDurationSeconds);

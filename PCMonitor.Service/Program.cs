@@ -8,6 +8,8 @@ using PCMonitor.Service.SessionDetection;
 using PCMonitor.Service.History;
 using PCMonitor.Service.Alerts;
 using Microsoft.Extensions.Hosting.WindowsServices;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +23,18 @@ builder.Services.Configure<HistoricalMonitoringOptions>(builder.Configuration.Ge
 builder.Services.Configure<ProcessMonitoringOptions>(builder.Configuration.GetSection(ProcessMonitoringOptions.SectionName));
 builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 builder.Services.AddSingleton<ISensorProvider, LibreHardwareMonitorSensorProvider>();
 builder.Services.AddSingleton<SensorSnapshotStore>();
 builder.Services.AddSingleton<SetupPageService>();
@@ -42,6 +55,7 @@ var port = builder.Configuration.GetValue("Server:Port", 5005);
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var app = builder.Build();
+app.UseResponseCompression();
 app.UseWebSockets();
 
 app.MapGet("/status", () => new ServiceStatus(
@@ -51,6 +65,17 @@ app.MapGet("/status", () => new ServiceStatus(
     DateTimeOffset.UtcNow));
 
 app.MapGet("/api/sensors", (SensorSnapshotStore snapshots) => snapshots.Current);
+app.MapGet("/api/sensors/catalog", (HistoricalHistoryStore history) => Results.Ok(history.GetCatalog()));
+app.MapGet("/api/history/manifest", (HttpContext context, HistoricalHistoryStore history) =>
+{
+    var manifest = history.GetManifest();
+    var tag = $"\"{manifest.StreamId:N}-{manifest.CatalogVersion}-{manifest.NewestSequence ?? 0}-{manifest.BucketCount}\"";
+    context.Response.Headers.ETag = tag;
+    context.Response.Headers.CacheControl = "no-cache";
+    if (context.Request.Headers.IfNoneMatch.Any(value => value == tag))
+        return Results.StatusCode(StatusCodes.Status304NotModified);
+    return Results.Ok(manifest);
+});
 app.MapGet("/api/session", (LoadSessionDetector detector) => detector.GetCurrent());
 app.MapGet("/api/session/last", (LoadSessionDetector detector) => detector.GetLast());
 app.MapGet("/api/alerts", (
@@ -60,7 +85,11 @@ app.MapGet("/api/alerts", (
 app.MapGet("/api/history", (
     DateTimeOffset? from,
     DateTimeOffset? to,
-    string? sensorId,
+    long? afterSequence,
+    long? beforeSequence,
+    int? limit,
+    string? resolution,
+    int[]? sensorId,
     Guid? sessionId,
     HistoricalHistoryStore history) =>
 {
@@ -69,7 +98,24 @@ app.MapGet("/api/history", (
         return Results.BadRequest(new { error = "'from' must be earlier than 'to'." });
     }
 
-    return Results.Ok(history.Query(from, to, sensorId, sessionId));
+    var parsedResolution = resolution?.ToLowerInvariant() switch
+    {
+        null or "minute" => HistoryResolution.Minute,
+        "hour" => HistoryResolution.Hour,
+        "day" => HistoryResolution.Day,
+        _ => (HistoryResolution?)null
+    };
+    if (parsedResolution is null)
+    {
+        return Results.BadRequest(new { error = "'resolution' must be minute, hour, or day." });
+    }
+    if (afterSequence < 0 || beforeSequence < 0 || limit <= 0)
+    {
+        return Results.BadRequest(new { error = "'afterSequence' cannot be negative and 'limit' must be positive." });
+    }
+
+    return Results.Ok(history.QueryCompact(from, to, afterSequence, limit, parsedResolution.Value,
+        sensorId, sessionId, beforeSequence));
 });
 
 app.MapGet("/setup", (SetupPageService setupPage) => Results.Content(

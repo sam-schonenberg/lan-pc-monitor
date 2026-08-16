@@ -27,6 +27,15 @@ public sealed class MonitorApiClient(IAppSettingsService settings)
         await GetAsync<SessionStatusDto>("api/session", null, token);
     public async Task<HistoricalHistoryResponseDto> GetHistoryAsync(DateTimeOffset? from, CancellationToken token = default) =>
         await GetAsync<HistoricalHistoryResponseDto>("api/history" + QueryFrom(from), null, token);
+    public async Task<SensorCatalogResponseDto> GetSensorCatalogAsync(CancellationToken token = default) =>
+        await GetAsync<SensorCatalogResponseDto>("api/sensors/catalog", null, token);
+    public async Task<HistoryManifestResponseDto> GetHistoryManifestAsync(CancellationToken token = default) =>
+        await GetAsync<HistoryManifestResponseDto>("api/history/manifest", null, token);
+    public async Task<CompactHistoryResponseDto> GetCompactHistoryAsync(long? afterSequence, int limit = 500,
+        CancellationToken token = default, long? beforeSequence = null) => await GetAsync<CompactHistoryResponseDto>(
+            $"api/history?limit={limit}" +
+            (afterSequence is null ? string.Empty : $"&afterSequence={afterSequence}") +
+            (beforeSequence is null ? string.Empty : $"&beforeSequence={beforeSequence}"), null, token);
     public async Task<AlertHistoryResponseDto> GetAlertsAsync(DateTimeOffset? from, CancellationToken token = default) =>
         await GetAsync<AlertHistoryResponseDto>("api/alerts" + QueryFrom(from), null, token);
 

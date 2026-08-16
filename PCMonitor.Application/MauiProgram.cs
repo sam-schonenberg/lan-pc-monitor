@@ -5,6 +5,9 @@ using PCMonitor.Application.Services.Storage;
 using PCMonitor.Application.Services.Sync;
 using PCMonitor.Application.ViewModels;
 using PCMonitor.Application.Views;
+using LiveChartsCore.SkiaSharpView.Maui;
+using SkiaSharp.Views.Maui.Controls.Hosting;
+using PCMonitor.Application.Services;
 
 namespace PCMonitor.Application;
 
@@ -13,18 +16,27 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>().ConfigureFonts(fonts =>
+        builder.UseMauiApp<App>().UseSkiaSharp().UseLiveCharts().ConfigureFonts(fonts =>
         {
             fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
         });
         builder.Services.AddSingleton<AppDatabase>();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IAppSettingsService, AppSettingsService>();
         builder.Services.AddSingleton<AlertRepository>();
         builder.Services.AddSingleton<HistoryRepository>();
+        builder.Services.AddSingleton<DashboardWidgetRepository>();
         builder.Services.AddSingleton<MonitorApiClient>();
         builder.Services.AddSingleton<MonitorWebSocketClient>();
+        builder.Services.AddSingleton<CurrentSensorStateService>();
+#if ANDROID
+        builder.Services.AddSingleton<IHistoryBackgroundScheduler, Platforms.Android.AndroidHistoryBackgroundScheduler>();
+#else
+        builder.Services.AddSingleton<IHistoryBackgroundScheduler, NoOpHistoryBackgroundScheduler>();
+#endif
         builder.Services.AddSingleton<HistorySyncService>();
+        builder.Services.AddSingleton<ForegroundHistorySyncCoordinator>();
         builder.Services.AddSingleton<AlertSyncService>();
         builder.Services.AddSingleton<AppConnectionService>();
         builder.Services.AddTransient<SetupViewModel>();

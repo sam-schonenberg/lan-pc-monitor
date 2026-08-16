@@ -70,3 +70,4 @@ $RECYCLE.BIN/
 *.bak
 *.swp
 *~
+.codex-remote-attachments/

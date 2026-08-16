@@ -16,6 +16,7 @@ The solution also contains an optional WinForms tray companion for controlling t
 - Per-session minimum, maximum, average, current value, and sample count
 - Clock-aligned historical aggregation, with one bucket per minute by default
 - Rolling in-memory history and JSONL recovery after restarts
+- Compact, compressed cursor-based history synchronization with minute/hour/day views
 - Local setup page with a dynamically generated LAN QR code
 - Windows Service hosting support
 - Private-profile, local-subnet Windows Firewall rule
@@ -72,6 +73,7 @@ Open:
 - Current load session: <http://localhost:5005/api/session>
 - Most recently completed session: <http://localhost:5005/api/session/last>
 - Historical records: <http://localhost:5005/api/history>
+- Sensor catalog: <http://localhost:5005/api/sensors/catalog>
 
 Use `http://`, not `https://`. HTTPS is not configured in the current LAN-only MVP.
 
@@ -153,7 +155,16 @@ Returns retained alerts in chronological order. Alerts remain in memory for 24 h
 
 ### `GET /api/history`
 
-Returns finalized historical buckets. The currently accumulating bucket is not exposed.
+Returns finalized historical buckets using compact numeric sensor IDs. Sensor metadata is supplied separately by `GET /api/sensors/catalog`; the catalog response has a version, and every history response names the catalog version it uses. Numeric IDs are transport identifiers—the stable LibreHardwareMonitor-derived string keys remain the internal identities.
+
+Normal synchronization is cursor-based and includes all sensors:
+
+```text
+GET /api/sensors/catalog
+GET /api/history?afterSequence=12345&limit=500
+```
+
+Each finalized minute bucket has a persistent, monotonically increasing `sequence`. The response includes `fromSequence`, `toSequence`, `hasMore`, and `nextSequence`. Page size defaults to 500 and is capped at 2000. Pass the returned `nextSequence` as the next `afterSequence` while `hasMore` is true.
 
 Optional filters:
 
@@ -162,6 +173,8 @@ Optional filters:
 /api/history?from=2026-08-14T12:00:00Z&to=2026-08-14T14:00:00Z
 /api/history?sensorId=/gpu-nvidia/0/temperature/0
 /api/history?sessionId=6e78182d-6a2b-4b79-9d33-cfb4327e65b8
+/api/history?from=2026-07-01T00:00:00Z&to=2026-08-01T00:00:00Z&resolution=hour
+/api/history?sensorId=17&sensorId=23
 ```
 
 - `from` is exclusive, making it suitable for incremental synchronization.
@@ -169,6 +182,34 @@ Optional filters:
 - Times must be valid UTC-capable ISO 8601 values.
 - If both are supplied, `from` must be earlier than `to`.
 - `sessionId` accepts a GUID and returns buckets associated with that confirmed session.
+- `resolution` accepts `minute` (default), `hour`, or `day`.
+- Repeated numeric `sensorId` values can narrow interactive graph/debugging queries. Background synchronization should omit this filter so all diagnostic sensors are retained.
+
+Minute history remains the persisted server representation. Hour and day buckets are generated on request, aligned to UTC clock hours and UTC calendar days. Their minimum and maximum are extrema of the source buckets, sample counts are summed, and averages are weighted by sample count (not averaged as averages). Historical values are rounded to one decimal only in the compact API DTO; internal calculations and JSONL data retain their precision.
+
+API clients that send `Accept-Encoding: br` or `Accept-Encoding: gzip` receive built-in ASP.NET Core response compression for suitable responses, including history, catalog, and alerts.
+
+### `GET /api/history/manifest`
+
+Returns a compact inventory of the history currently retained by the Windows service: persistent `streamId`, catalog version, oldest/newest sequence and timestamps, bucket count, resolution, retention window, and compressed sequence ranges. Clients can send the returned `ETag` with `If-None-Match`; an unchanged inventory returns `304 Not Modified` without retransmitting JSON.
+
+Progressive synchronization follows this architecture:
+
+```text
+Service history manifest
+        ↓
+Phone sequence-coverage ledger
+        ↓
+Newest missing data first
+        ↓
+UI becomes useful immediately
+        ↓
+WorkManager fills older gaps in background
+```
+
+The phone persists a sequence-coverage ledger keyed by the manifest's `streamId`. Successfully committed pages are compressed into non-overlapping intervals, and manifest comparison produces precise missing ranges without scanning per-sensor history rows. A changed stream identity starts independent coverage while previously saved measurements remain available.
+
+Foreground synchronization requests the newest missing range first and commits one 60-bucket page (normally about one hour), so History can redraw without waiting for the complete retained archive. If gaps remain, a network-constrained Android WorkManager job stores older pages in bounded batches. Unique periodic maintenance runs at Android's 15-minute minimum interval and resumes from the same ledger, including after app restarts. The scheduler does not request a battery-optimization exemption; Android remains free to defer background work.
 
 Historical buckets include nullable `sessionId` and `dominantProcess` fields. A bucket is associated with a session when at least one normalized sensor snapshot observed that session in the confirmed `active` state. Candidate-only activity is never persisted as a session association. Buckets are not split when a session begins or ends partway through a minute.
 
@@ -190,7 +231,7 @@ The main settings are in [`PCMonitor.Service/appsettings.json`](PCMonitor.Servic
     "StartCpuLoadPercent": 40,
     "StartGpuLoadPercent": 40,
     "StartWindowSeconds": 10,
-    "StartDurationSeconds": 10,
+    "StartDurationSeconds": 30,
     "EndCpuLoadPercent": 20,
     "EndGpuLoadPercent": 20,
     "EndWindowSeconds": 30,
@@ -199,7 +240,9 @@ The main settings are in [`PCMonitor.Service/appsettings.json`](PCMonitor.Servic
   "HistoricalMonitoring": {
     "Enabled": true,
     "BucketDurationSeconds": 60,
-    "RetentionHours": 24
+    "RetentionHours": 168,
+    "DefaultPageSize": 500,
+    "MaximumPageSize": 2000
   },
   "ProcessMonitoring": {
     "Enabled": true,
@@ -243,7 +286,9 @@ By default, finalized history is stored at:
 %ProgramData%\LanPcMonitor\history\sensor-history.jsonl
 ```
 
-Each line is an independent JSON historical bucket. The service appends approximately once per minute, restores retained records during startup, and periodically compacts the file. History remains in memory if persistence becomes unavailable.
+Each line is an independent JSON historical bucket. The service appends approximately once per minute, keeps a rolling seven days by default, restores retained records during startup, and periodically compacts the file. The mobile database retains synchronized records for offline browsing; phone-side long-term retention/downsampling policy is intentionally deferred. History remains in memory if PC persistence becomes unavailable.
+
+All available supported sensors continue to be recorded, including zero-valued and unchanged readings. Metadata deduplication, paging, aggregation, compact DTOs, and HTTP compression reduce transfer cost without weakening the service's crash-analysis semantics. A missing minute remains a genuine history gap; no “last value continues” behavior is used. Older JSONL records without a sequence remain readable and receive valid sequences during recovery.
 
 Confirmed buckets retain their session GUID and per-minute dominant-process summary. This makes the historical timeline groupable by session after restart, although exact standalone session-boundary metadata and `/api/session/last` remain memory-only.
 
@@ -265,7 +310,19 @@ Only normalized process names such as `witcher3.exe` and aggregate CPU percentag
 
 On first launch, the app opens Setup instead of the dashboard. The user must enter a private LAN endpoint and successfully call `/status` before saving it. Inputs such as `192.168.1.50:5005` are normalized to HTTP. Public/internet host addresses and HTTPS endpoints are rejected.
 
-After setup, Shell provides Dashboard, History, Alerts, and Settings tabs. History and alerts are stored under `FileSystem.AppDataDirectory` in `lanpcmonitor.db3`, remain viewable while the PC is offline, and use stable identities to avoid duplicates during incremental synchronization. Detailed dashboards, graphs, QR scanning, background synchronization, and Android notification presentation are not implemented yet.
+After setup, Shell provides Dashboard, History, Alerts, and Settings tabs. History and alerts are stored under `FileSystem.AppDataDirectory` in `lanpcmonitor.db3`, remain viewable while the PC is offline, and use stable identities to avoid duplicates during incremental synchronization.
+
+The History tab is a local-first browser. It offers a friendly hardware/sensor picker, remembers the selected sensor, and supports 1-hour, 6-hour, 24-hour, 7-day, 30-day, and 1-year ranges. Summary minimum/maximum/latest values and the sample-count-weighted average are queried separately from SQLite. Detailed records are newest-first and load from SQLite in 60-record pages as the user scrolls; scrolling never issues history API calls. Pull-to-refresh runs catalog/cursor synchronization and then reloads the current view. If the PC is offline, already saved history remains displayed.
+
+History synchronization runs once when the app becomes active and presents short foreground progress; manual synchronization and its last-successful timestamp live in Settings. Synchronization is serialized so lifecycle, Settings, Dashboard refresh, and History refresh cannot start overlapping transfers.
+
+The History chart uses the open-source LiveCharts2 MAUI package through one reusable `SensorChart` control. It plots the selected sensor's average as the primary line with subtle minimum and maximum boundaries, local-time axes, unit-aware values, and touch tooltips. Dashboard Graph widgets reuse this control in compact mode rather than maintaining a second chart implementation.
+
+Dashboard is customizable with persisted Current Value, Graph, and Alerts widgets. Stored order plus half/full width determines a two-column packed layout. Edit mode supports catalog-driven add/edit, Move Up/Move Down, enable/disable, and confirmed deletion; touch drag-and-drop is not implemented. Current Value widgets use the shared WebSocket sensor state when online and clearly labeled latest SQLite history when offline, with optional 24-hour minimum/maximum values. Graph widgets query only their configured local history range and continue working offline. Alerts widgets use filtered local alert history and refresh from the existing shared alert stream. Widget configurations and ordering remain in `lanpcmonitor.db3`.
+
+Chart data always comes from local SQLite. The 1-hour, 6-hour, and 24-hour views use stored minute records; 7-day and 30-day views create clock-aligned hourly points at query time; the 1-year view creates daily points. Aggregates preserve extrema, sample counts, and sample-count-weighted averages without modifying the underlying minute history. Detailed-list pagination remains an independent 60-row SQLite query path.
+
+Progressive destructive downsampling, QR scanning, and Android notification presentation are not implemented yet.
 
 Android permits cleartext traffic because the current PC service intentionally uses local HTTP. The app limits configured endpoints to private IPv4 addresses, localhost, `.local` names, or unqualified LAN hostnames. `INTERNET` and `ACCESS_NETWORK_STATE` are the only requested network permissions.
 

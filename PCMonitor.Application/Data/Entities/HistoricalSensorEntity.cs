@@ -4,8 +4,12 @@ namespace PCMonitor.Application.Data.Entities;
 public sealed class HistoricalSensorEntity
 {
     [PrimaryKey] public string Id { get; set; } = string.Empty;
-    [Indexed] public DateTimeOffset BucketStartTime { get; set; }
-    public DateTimeOffset BucketEndTime { get; set; }
+    [Indexed] public string StreamId { get; set; } = string.Empty;
+    [Indexed] public long Sequence { get; set; }
+    [Indexed] public long BucketStartUtcTicks { get; set; }
+    public long BucketEndUtcTicks { get; set; }
+    [Ignore] public DateTimeOffset BucketStartTime => new(BucketStartUtcTicks, TimeSpan.Zero);
+    [Ignore] public DateTimeOffset BucketEndTime => new(BucketEndUtcTicks, TimeSpan.Zero);
     [Indexed] public string SensorId { get; set; } = string.Empty;
     public string Hardware { get; set; } = string.Empty;
     public string SensorName { get; set; } = string.Empty;

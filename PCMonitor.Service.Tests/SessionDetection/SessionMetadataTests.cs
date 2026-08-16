@@ -12,6 +12,21 @@ public sealed class SessionMetadataTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"pcmonitor-session-tests-{Guid.NewGuid():N}");
 
     [Fact]
+    public void DefaultConfirmationRequiresThirtySeconds()
+    {
+        var context = new SessionRuntimeContext();
+        var detector = new LoadSessionDetector(new LoadSensorSelector(), context,
+            Options.Create(new SessionDetectionOptions { StartWindowSeconds = 1 }),
+            NullLogger<LoadSessionDetector>.Instance);
+        var start = DateTimeOffset.UtcNow;
+        detector.Process(LoadSnapshot(start, 80));
+        detector.Process(LoadSnapshot(start.AddSeconds(10), 80));
+        Assert.Equal(LoadSessionState.Candidate, detector.GetCurrent().State);
+        detector.Process(LoadSnapshot(start.AddSeconds(30), 80));
+        Assert.Equal(LoadSessionState.Active, detector.GetCurrent().State);
+    }
+
+    [Fact]
     public void CandidateIdRemainsStableWhenPromoted()
     {
         var detector = CreateDetector(out _);

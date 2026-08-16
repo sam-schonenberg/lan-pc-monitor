@@ -9,6 +9,7 @@ public sealed class MonitorWebSocketClient(MonitorApiClient api, AlertRepository
     private CancellationTokenSource? _lifetime;
     public event EventHandler<SensorSnapshotDto>? SensorsReceived;
     public event EventHandler<MonitorAlertDto>? AlertReceived;
+    public bool IsConnected => _socket?.State == WebSocketState.Open;
     public async Task ConnectAsync(CancellationToken token = default)
     {
         await DisconnectAsync();

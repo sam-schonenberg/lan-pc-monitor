@@ -8,7 +8,7 @@ public partial class SetupViewModel(MonitorApiClient api, IAppSettingsService se
     [ObservableProperty] public partial string Address { get; set; } = string.Empty;
     [ObservableProperty] public partial string StatusMessage { get; set; } = "Enter the private LAN address shown by PCMonitor.";
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SaveCommand))] public partial bool ConnectionVerified { get; set; }
-    [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SaveCommand))] public partial bool IsBusy { get; set; }
     private string? _verifiedUrl;
     public event EventHandler? Saved;
 
