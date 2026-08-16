@@ -8,6 +8,7 @@ using PCMonitor.Application.Views;
 using LiveChartsCore.SkiaSharpView.Maui;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 using PCMonitor.Application.Services;
+using ZXing.Net.Maui.Controls;
 
 namespace PCMonitor.Application;
 
@@ -16,7 +17,7 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>().UseSkiaSharp().UseLiveCharts().ConfigureFonts(fonts =>
+        builder.UseMauiApp<App>().UseBarcodeReader().UseSkiaSharp().UseLiveCharts().ConfigureFonts(fonts =>
         {
             fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");

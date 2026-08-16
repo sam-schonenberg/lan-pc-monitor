@@ -13,7 +13,15 @@ public partial class SetupViewModel(MonitorApiClient api, IAppSettingsService se
     public event EventHandler? Saved;
 
     [RelayCommand]
-    private async Task TestConnectionAsync()
+    private Task TestConnectionAsync() => TestAddressAsync();
+
+    public async Task ApplyScannedAddressAsync(string value)
+    {
+        Address = value;
+        await TestAddressAsync();
+    }
+
+    private async Task TestAddressAsync()
     {
         IsBusy = true; ConnectionVerified = false; StatusMessage = "Connecting…";
         try
