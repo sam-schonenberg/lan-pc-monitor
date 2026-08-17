@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PCMonitor.Application.Models;
 using PCMonitor.Application.Services.Api;
 using PCMonitor.Application.Services.Storage;
 using PCMonitor.Application.Services.Sync;
@@ -37,8 +38,8 @@ public partial class SettingsViewModel(
             Sensors.Clear();
             foreach (var sensor in sensors)
             {
-                Sensors.Add(new SensorVisibilityOption(sensor.SensorId,
-                    $"{sensor.SensorType} — {sensor.Hardware} — {sensor.SensorName}",
+                Sensors.Add(new SensorVisibilityOption(sensor.SensorId, sensor.SensorName,
+                    SensorVisibilityOption.FormatDetails(sensor.SensorType, sensor.Hardware),
                     !hidden.Contains(sensor.SensorId), SetVisibilityAsync));
             }
         }
@@ -95,10 +96,13 @@ public sealed class SensorVisibilityOption : ObservableObject
 {
     private readonly Func<string, bool, Task> _save;
     private bool _isVisible;
-    public SensorVisibilityOption(string id, string displayName, bool isVisible, Func<string, bool, Task> save)
-    { Id = id; DisplayName = displayName; _isVisible = isVisible; _save = save; }
+    public SensorVisibilityOption(string id, string displayName, string details, bool isVisible, Func<string, bool, Task> save)
+    { Id = id; DisplayName = displayName; Details = details; _isVisible = isVisible; _save = save; }
     public string Id { get; }
     public string DisplayName { get; }
+    public string Details { get; }
+    public static string FormatDetails(string type, string hardware) =>
+        $"{SensorDisplayText.FriendlyType(type)} · {hardware}";
     public bool IsVisible
     {
         get => _isVisible;

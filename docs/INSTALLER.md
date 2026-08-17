@@ -13,7 +13,7 @@ The MSI:
 - stops the service safely during upgrades and uninstallation;
 - configures three restart-on-failure attempts with a five-second delay;
 - creates the `LAN PC Monitor - API` inbound firewall rule for TCP port `5005`;
-- restricts that rule to the Windows Private profile and local subnet;
+- restricts that rule to the local subnet while allowing all Windows network profiles, including Public;
 - adds a Start Menu shortcut for the optional tray companion;
 - starts the tray companion automatically whenever a user signs in;
 - prevents duplicate tray companion instances within the same Windows session;
@@ -42,7 +42,7 @@ This conservative behavior prevents upgrades or accidental uninstallations from 
 From the repository root:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.0
+.\scripts\build-installer.ps1 -Version 0.1.1
 ```
 
 The script:
@@ -55,8 +55,8 @@ The script:
 Outputs:
 
 ```text
-artifacts\installer\LanPcMonitor-0.1.0-win-x64.msi
-artifacts\installer\LanPcMonitor-0.1.0-win-x64.msi.sha256
+artifacts\installer\LanPcMonitor-0.1.1-win-x64.msi
+artifacts\installer\LanPcMonitor-0.1.1-win-x64.msi.sha256
 ```
 
 MSI versions must use three numeric parts. Build each public version from a clean tagged commit.
@@ -68,7 +68,7 @@ Installer behavior should be tested in Windows Sandbox or a disposable Windows V
 1. Install version N and confirm UAC identifies the expected publisher.
 2. Confirm the `PCMonitor` service is automatic and running.
 3. Confirm `/status` responds locally.
-4. Confirm the firewall rule is Private + LocalSubnet + TCP 5005.
+4. Confirm the firewall rule is All profiles + LocalSubnet + TCP 5005.
 5. Launch the tray shortcut and exercise service controls.
 6. Modify `appsettings.json` and create history.
 7. Install version N+1 and verify configuration/history survive.
@@ -95,13 +95,14 @@ A future tray command may perform a manual or opt-in GitHub Releases check. It s
 
 Public releases should Authenticode-sign the service executable, tray executable, and final MSI with SHA-256 and an RFC 3161 timestamp. Keep signing credentials outside the repository—preferably in protected CI secrets or hardware-backed key storage.
 
+The signing certificate's verified subject must identify `Schonenberg Developments` for Windows UAC to display that publisher name. The MSI manufacturer and .NET application metadata use the same identity, but metadata alone does not establish a verified publisher.
+
 Unsigned development MSIs will show an unknown-publisher warning. A checksum detects accidental corruption but does not establish publisher identity; it is not a substitute for Authenticode.
 
 ## Current installer limitations
 
 - x64 Windows only;
 - fixed firewall port `5005` during MSI installation;
-- no optional tray autostart setting yet;
 - no data-removal checkbox yet;
 - no signing certificate configured; and
 - no in-product update checker yet.

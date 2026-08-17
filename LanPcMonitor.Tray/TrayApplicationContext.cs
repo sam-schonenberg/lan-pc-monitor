@@ -7,6 +7,7 @@ namespace LanPcMonitor.Tray;
 internal sealed class TrayApplicationContext : ApplicationContext
 {
     private const string ServiceName = "PCMonitor";
+    private readonly Icon? _applicationIcon;
     private readonly NotifyIcon _notifyIcon;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _startItem;
@@ -47,9 +48,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         ]);
         menu.Opening += (_, _) => RefreshStatus();
 
+        _applicationIcon = Environment.ProcessPath is { } processPath
+            ? Icon.ExtractAssociatedIcon(processPath)
+            : null;
         _notifyIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Information,
+            Icon = _applicationIcon ?? SystemIcons.Information,
             Text = "LAN PC Monitor",
             ContextMenuStrip = menu,
             Visible = true
@@ -246,6 +250,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _applicationIcon?.Dispose();
         base.ExitThreadCore();
     }
 }

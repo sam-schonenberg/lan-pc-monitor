@@ -7,8 +7,11 @@
     </linearGradient>
   </defs>
   <rect width="493" height="58" fill="url(#bg)"/>
-  <g transform="translate(438 9)" fill="none" stroke="#67e8f9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="1" y="3" width="38" height="26" rx="4"/>
-    <path d="M14 39h13M20.5 29v10M7 20l7-7 6 6 8-10 6 5"/>
+  <g transform="translate(438 8)">
+    <rect width="42" height="42" rx="8" fill="#081426"/>
+    <rect x="5" y="8" width="32" height="22" rx="3" fill="#12315a" stroke="#f8fafc" stroke-width="2"/>
+    <path d="M17 37h9M21.5 30v7" fill="none" stroke="#f8fafc" stroke-width="2" stroke-linecap="round"/>
+    <path d="M8 20h5l3-5 3 10 4-13 3 11 3-6 3 3h3" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M28 25v2M31.5 23v4M35 21v6" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round"/>
   </g>
 </svg>

@@ -1,8 +1,16 @@
 <Project>
   <PropertyGroup>
     <!-- Keep all .NET applications aligned with the GitHub release tag. -->
-    <VersionPrefix>0.1.0</VersionPrefix>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <VersionPrefix>0.1.1</VersionPrefix>
+    <AssemblyVersion>0.1.1.0</AssemblyVersion>
+    <FileVersion>0.1.1.0</FileVersion>
+    <Company>Schonenberg Developments</Company>
+    <Authors>Schonenberg Developments</Authors>
+    <Product>LAN PC Monitor</Product>
+    <Copyright>Copyright © 2026 Schonenberg Developments</Copyright>
+    <Description>LAN-only PC hardware monitoring service, tray companion, and cross-platform client.</Description>
+    <RepositoryUrl>https://github.com/sam-schonenberg/lan-pc-monitor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

@@ -79,7 +79,7 @@ public sealed class LibreHardwareMonitorSensorProvider : ISensorProvider, IDispo
                 readings.Add(new SensorReading(
                     sensor.Identifier.ToString(),
                     hardware.Name,
-                    sensor.Name,
+                    SensorDisplayName.Format(hardware.HardwareType, sensor.Name, sensor.SensorType),
                     sensor.SensorType.ToString(),
                     sensor.Value,
                     GetUnit(sensor.SensorType)));

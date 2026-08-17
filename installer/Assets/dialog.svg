@@ -14,13 +14,12 @@
   <rect width="168" height="312" fill="url(#glow)"/>
   <rect x="168" width="325" height="312" fill="#f8fafc"/>
   <rect x="167" width="1" height="312" fill="#cbd5e1"/>
-  <g transform="translate(30 55)" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="0" y="0" width="108" height="75" rx="10" stroke="#ecfeff" stroke-width="5"/>
-    <path d="M35 102h38M54 75v27" stroke="#ecfeff" stroke-width="5"/>
-    <path d="M15 55l20-21 17 16 24-31 17 17" stroke="#67e8f9" stroke-width="6"/>
-    <circle cx="39" cy="37" r="5" fill="#67e8f9" stroke="none"/>
-    <circle cx="57" cy="55" r="5" fill="#67e8f9" stroke="none"/>
-    <circle cx="83" cy="21" r="5" fill="#67e8f9" stroke="none"/>
+  <g transform="translate(25 34)">
+    <rect width="118" height="118" rx="22" fill="#081426"/>
+    <rect x="15" y="22" width="88" height="61" rx="9" fill="#12315a" stroke="#f8fafc" stroke-width="6"/>
+    <path d="M46 101h26M59 83v18" fill="none" stroke="#f8fafc" stroke-width="6" stroke-linecap="round"/>
+    <path d="M21 53h14l7-13 9 28 11-39 9 32 8-18 8 10h8" fill="none" stroke="#22d3ee" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M76 69v5M85 65v9M94 60v14" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/>
   </g>
   <text x="22" y="205" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">LAN PC Monitor</text>
   <text x="23" y="230" fill="#a5f3fc" font-family="Segoe UI, Arial, sans-serif" font-size="9">PRIVATE NETWORK MONITORING</text>

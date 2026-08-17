@@ -40,6 +40,7 @@ BenchmarkDotNet.Artifacts/
 !.env.example
 appsettings.Local.json
 appsettings.*.Local.json
+*.Local.props
 secrets.json
 
 # Signing keys and provisioning profiles

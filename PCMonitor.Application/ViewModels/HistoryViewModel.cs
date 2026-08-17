@@ -334,7 +334,10 @@ public sealed record HistoryRangeOption(HistoryRange Range, string DisplayName, 
 
 public sealed record HistorySensorOption(string Id, string Hardware, string Name, string Type, string? Unit)
 {
-    public string DisplayName => $"{Type} — {Hardware} — {Name}";
+    // Native pickers have a single compact row. The selected sensor's hardware and type
+    // are shown below the picker instead of making every option unreadably long.
+    public string DisplayName => SensorDisplayText.PickerLabel(Name, Type);
+    public string Details => $"{SensorDisplayText.FriendlyType(Type)} · {Hardware}";
     public bool IsTemperature => Type.Contains("temperature", StringComparison.OrdinalIgnoreCase);
     public bool IsGpuTemperature => IsTemperature && Hardware.Contains("gpu", StringComparison.OrdinalIgnoreCase) ||
                                     IsTemperature && Hardware.Contains("nvidia", StringComparison.OrdinalIgnoreCase) ||

@@ -1,121 +1,108 @@
-# LAN PC Monitor
+<div align="center">
+  <img src="assets/branding/lan-pc-monitor-icon.png" width="112" alt="LAN PC Monitor icon">
+  <h1>LAN PC Monitor</h1>
+  <p>Understand your Windows PC's temperatures, usage, clocks, fans, and memory from another device on your local network.</p>
 
-LAN PC Monitor is a self-hosted hardware monitor for Windows. A lightweight Windows service reads CPU, GPU, memory, motherboard, and other supported sensors through [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor), then makes current and historical readings available to devices on the same local network.
+  <a href="https://github.com/sam-schonenberg/lan-pc-monitor/releases/latest"><img src="https://img.shields.io/github/v/release/sam-schonenberg/lan-pc-monitor?display_name=tag&amp;sort=semver" alt="Latest release"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</div>
 
-There is no cloud backend, account, telemetry service, remote relay, or router configuration. During normal operation, the monitoring service makes no outbound internet connections. Monitoring data stays on the PC and on clients that you explicitly connect over your LAN.
+LAN PC Monitor combines a lightweight Windows monitoring service with a companion app. It turns hardware-specific sensor labels into readable names, keeps recent history locally, and offers live dashboards, charts, alerts, and load-session summaries.
+
+Everything runs on your own network. There is no account, cloud backend, telemetry service, remote relay, or router configuration.
 
 > [!IMPORTANT]
-> The current API uses HTTP and WebSockets without authentication or encryption. The supplied firewall rule limits inbound access to the local subnet on Windows networks classified as **Private**, but every device on that trusted subnet may be able to read the monitoring data. Never forward the API port, expose it to the internet, or use it on an untrusted network.
+> The current API uses unencrypted HTTP and WebSockets without authentication. Install it only on a trusted local network. Never forward port `5005` or expose it to the internet.
 
-## What it does
+## Download and install
 
-- Polls supported hardware sensors about once per second.
-- Streams live readings and alerts over a standard WebSocket connection.
-- Detects sustained CPU/GPU load sessions and records per-session statistics.
-- Samples only normalized process names and aggregate CPU usage while a load session is being detected or is active.
-- Evaluates sustained temperature warnings and critical alerts with hysteresis.
-- Stores clock-aligned minute history locally and restores it after restarts.
-- Offers compressed, cursor-based history synchronization and minute/hour/day views.
-- Provides a local-first .NET MAUI client with offline history, charts, and configurable dashboard widgets.
-- Includes an optional Windows notification-area companion for service administration.
+### 1. Install the Windows monitor
 
-## Components
+[**Download the latest Windows installer from GitHub Releases**](https://github.com/sam-schonenberg/lan-pc-monitor/releases/latest)
 
-| Project | Purpose |
+Open the release's **Assets** section and download `LanPcMonitor-0.1.1-win-x64.msi`. Run the installer as an administrator. It installs:
+
+- the background monitoring service;
+- the notification-area companion;
+- a Start Menu shortcut; and
+- a Windows Firewall rule limited to the local subnet.
+
+The setup completion page opens the PC's local pairing page. Windows may show an unknown-publisher warning while public code signing is not configured. See [Installer and updates](docs/INSTALLER.md) for detailed behavior and verification.
+
+### 2. Install the companion app
+
+Install **LAN PC Monitor** from Google Play when the listing is available. For private testing, use the testing link supplied by the developer in Play Console.
+
+The Android app is only a viewer; the Windows monitor must be installed and running on the PC.
+
+### 3. Connect
+
+Keep the phone and PC on the same local network, open the app, and scan the QR code shown by the PC's setup page. You can also enter the PC address manually, for example:
+
+```text
+http://192.168.1.50:5005
+```
+
+Guest Wi-Fi isolation, VPN routing, or another firewall can prevent devices on the same Wi-Fi from reaching each other.
+
+## What you get
+
+- Human-readable CPU, GPU, memory, fan, power, voltage, and temperature labels.
+- Live readings updated about once per second.
+- A customizable dashboard with current values, graphs, and alerts.
+- Local minute-by-minute history with hour, day, and longer-range charts.
+- Sustained temperature warnings and critical alerts with hysteresis.
+- CPU/GPU load-session detection and per-session statistics.
+- Offline access to history already synchronized to the app.
+- Local storage with configurable retention and no telemetry.
+
+The exact sensor set depends on the PC's hardware, drivers, permissions, and [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) support.
+
+## How it works
+
+| Component | Role |
 |---|---|
-| `PCMonitor.Service` | Headless Windows monitoring service, local HTTP API, history, alerts, and load-session detection. |
-| `PCMonitor.Application` | .NET MAUI client for setup, live dashboards, alerts, and offline history. |
-| `LanPcMonitor.Tray` | Optional WinForms tray companion for controlling the Windows service. |
-| `PCMonitor.Service.Tests` | Service history, alert, and session tests. |
-| `PCMonitor.Application.Tests` | Application storage, chart, and dashboard tests. |
-| `scripts` | Service installation and narrowly scoped Windows Firewall maintenance. |
+| Windows service | Reads hardware sensors, records history, evaluates alerts, and exposes the LAN API. |
+| Android/MAUI app | Displays live readings, dashboards, alerts, and synchronized offline history. |
+| Tray companion | Opens the monitoring page and controls, enables, disables, or uninstalls the service. |
 
-The service does not depend on the tray application or mobile client. Any LAN client can use the documented API.
+Monitoring data is stored under `%ProgramData%\LanPcMonitor` on the PC. The app keeps synchronized history and preferences in its private local database. Process monitoring retains only normalized process names such as `game.exe` and aggregate CPU statistics during detected load sessions—never paths, command lines, window titles, documents, memory contents, or network activity.
 
-## Network and security model
-
-LAN PC Monitor is designed around an explicit trusted-LAN boundary:
-
-- **No runtime cloud dependency:** the service does not upload sensor data, contact an external API, open a tunnel, or require an account.
-- **No automatic internet exposure:** the scripts do not configure UPnP, NAT, router port forwarding, public DNS, or a cloud relay.
-- **Restricted firewall rule:** installation permits inbound TCP only on the configured port, only for the Windows **Private** profile, and only from `LocalSubnet`.
-- **Private endpoints in the client:** the MAUI client accepts HTTP endpoints only when the host is loopback, private IPv4 (`10/8`, `172.16/12`, or `192.168/16`), `.local`, or an unqualified LAN hostname. Public IP addresses and HTTPS endpoints are rejected in the current version.
-- **Local persistence:** service history is stored under `%ProgramData%\LanPcMonitor`; client history and settings are stored in the app's local SQLite database.
-- **Data minimization:** process monitoring retains normalized executable names such as `game.exe` and aggregate CPU percentages. It does not collect executable paths, command lines, environment variables, window titles, document names, process memory, or per-process network activity.
-- **Bounded retention:** history is retained for seven days and alerts for 24 hours by default; both are configurable.
-- **No hidden write API:** the public API currently exposes read-only `GET` endpoints and a read-only event stream.
-
-Package restore, SDK installation, and source links in this README may naturally use the internet during development. That is separate from the running monitoring service, which has no outbound network integration.
-
-For the full threat model, limitations, and responsible-reporting guidance, see [Security](docs/SECURITY.md). For every route, query parameter, response shape, and synchronization rule, see the [API reference](docs/API.md). Packaging and upgrade behavior is documented in [Installer and updates](docs/INSTALLER.md).
+Read the full [security model](docs/SECURITY.md) before using the service on a shared or untrusted network.
 
 ## Requirements
 
-- Windows 10 or Windows 11 for the monitoring service
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) for development
-- Administrator access to install/control the Windows service and firewall rule
+For normal use:
 
-Some sensors may require elevation. The exact sensor set depends on the hardware, drivers, and LibreHardwareMonitor support.
+- x64 Windows 10 or Windows 11 for the monitoring service;
+- an Android device for the companion app; and
+- both devices on the same reachable local network.
 
-## Quick start for development
+For development:
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0);
+- the .NET MAUI Android workload for Android builds; and
+- administrator access for service and firewall testing.
+
+## Developer quick start
 
 ```powershell
-git clone <your-repository-url>
-cd PCMonitor.Service
+git clone https://github.com/sam-schonenberg/lan-pc-monitor.git
+cd lan-pc-monitor
 dotnet restore .\PCMonitor.Service.slnx
 dotnet run --project .\PCMonitor.Service\PCMonitor.Service.csproj
 ```
 
-The service listens on all local interfaces on port `5005` by default:
+The service listens on all local interfaces on port `5005` by default. Useful local endpoints:
 
-```text
-http://0.0.0.0:5005
-```
-
-Useful local URLs:
-
-- Setup page: <http://localhost:5005/setup>
-- Health/status: <http://localhost:5005/status>
+- Setup and pairing: <http://localhost:5005/setup>
+- Service status: <http://localhost:5005/status>
 - Current sensors: <http://localhost:5005/api/sensors>
-- API reference: [docs/API.md](docs/API.md)
+- Complete route reference: [API documentation](docs/API.md)
 
-Use `http://`, not `https://`. TLS is not configured in the current version.
+Use `http://`, not `https://`; TLS is not configured in this release.
 
-## Configuration
-
-Settings live in [`PCMonitor.Service/appsettings.json`](PCMonitor.Service/appsettings.json). The principal options are:
-
-| Section | Controls |
-|---|---|
-| `Monitoring` | Hardware polling interval. |
-| `SessionDetection` | CPU/GPU start and end thresholds, windows, and durations. |
-| `HistoricalMonitoring` | Bucket duration, retention, and API page-size limits. |
-| `ProcessMonitoring` | Whether and how often dominant processes are sampled during load sessions. |
-| `Alerts` | Evaluation interval, temperature thresholds, hysteresis, and retention. |
-| `Server` | LAN API port; default `5005`. |
-| `Setup` | Optional app-store links shown on the local setup page. |
-
-If you change the installed service port, update `PORT` in [`scripts/_common.bat`](scripts/_common.bat) or pass the same port to the firewall script:
-
-```powershell
-.\scripts\install-firewall-rule.bat 5010
-```
-
-## Local data
-
-Finalized service history is stored by default at:
-
-```text
-%ProgramData%\LanPcMonitor\history\sensor-history.jsonl
-```
-
-Each line is an independent historical bucket. The service appends roughly once per minute, periodically compacts the file, and keeps seven days by default. A persistent stream identity sits beside the history file. If persistence becomes unavailable, monitoring continues in memory.
-
-All supported readings—including zero and unchanged values—are retained. A missing minute remains a real gap; the service never fabricates a “last value continues” reading. A graceful shutdown preserves the partial current bucket, while a sudden crash may lose only that unfinished bucket.
-
-The MAUI client stores synchronized history, alerts, endpoint settings, and dashboard layout in `lanpcmonitor.db3` under its application data directory. Charts and scrolling read from SQLite, so saved data remains usable while the PC is offline.
-
-## Build and test
+### Build and test
 
 ```powershell
 dotnet build .\PCMonitor.Service.slnx --configuration Release
@@ -123,87 +110,63 @@ dotnet test .\PCMonitor.Service.Tests\PCMonitor.Service.Tests.csproj
 dotnet test .\PCMonitor.Application.Tests\PCMonitor.Application.Tests.csproj
 ```
 
-Build only the Android client with:
+Build the Android client alone with:
 
 ```powershell
 dotnet build .\PCMonitor.Application\PCMonitor.Application.csproj -f net10.0-android
 ```
 
-## Build the Windows installer
-
-Build the self-contained x64 MSI and its SHA-256 checksum with:
+Build the self-contained Windows MSI with:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.0
+.\scripts\build-installer.ps1 -Version 0.1.1
 ```
 
-The MSI installs the service and tray companion, configures restart-on-failure, creates the Private/LocalSubnet firewall rule, adds a Start Menu shortcut, and supports safe major upgrades. See [Installer and updates](docs/INSTALLER.md) for behavior, release testing, data preservation, signing, and update policy.
+Release maintainers should follow the [release checklist](docs/RELEASING.md).
 
-## Manual publish and script installation
+## Configuration
 
-The maintenance scripts remain available for development and troubleshooting when an MSI is not desired.
+Service settings live in [`PCMonitor.Service/appsettings.json`](PCMonitor.Service/appsettings.json).
 
-Publish the service and optional tray companion into one directory:
+| Section | Controls |
+|---|---|
+| `Monitoring` | Hardware polling interval. |
+| `SessionDetection` | CPU/GPU load thresholds and timing. |
+| `HistoricalMonitoring` | Bucket duration, retention, and API limits. |
+| `ProcessMonitoring` | Dominant-process sampling during load sessions. |
+| `Alerts` | Temperature thresholds, hysteresis, and retention. |
+| `Server` | LAN API port; default `5005`. |
+| `Setup` | Optional app-store links on the pairing page. |
+
+If you change the service port, update the firewall rule to match:
 
 ```powershell
-dotnet publish .\PCMonitor.Service\PCMonitor.Service.csproj `
-  --configuration Release --runtime win-x64 --self-contained true `
-  --output C:\LanPcMonitor
-
-dotnet publish .\LanPcMonitor.Tray\LanPcMonitor.Tray.csproj `
-  --configuration Release --runtime win-x64 --self-contained true `
-  --output C:\LanPcMonitor
+.\scripts\install-firewall-rule.bat 5010
 ```
-
-From an elevated terminal in that directory:
-
-```powershell
-.\scripts\install-service.bat
-```
-
-The installer registers `PCMonitor.Service.exe` as the automatically started `PCMonitor` Windows service, installs the firewall rule, and starts the service. The resulting firewall scope is:
-
-```text
-Direction:       Inbound
-Action:          Allow
-Protocol:        TCP
-Port:            5005 (configurable)
-Profile:         Private
-Remote address:  LocalSubnet
-```
-
-Uninstallation removes the service registration and its firewall rule without deleting arbitrary directories:
-
-```powershell
-.\scripts\uninstall-service.bat
-```
-
-## Connect from another LAN device
-
-Find the PC's private IPv4 address with `ipconfig`, then connect from a device on the same reachable LAN:
-
-```text
-http://192.168.1.50:5005/status
-ws://192.168.1.50:5005/ws/sensors
-```
-
-Guest Wi-Fi isolation, VPN routing, host firewalls, or a Windows network classified as Public may intentionally prevent access.
 
 ## Current limitations
 
-- The monitoring service is Windows-only.
-- The API has no authentication, device pairing, authorization, rate limiting, or TLS yet.
-- The QR code contains the current private IP address; mDNS rediscovery is not implemented.
-- `/api/session/last` is memory-only, although finalized history retains session associations.
-- A sudden crash can lose the currently accumulating history bucket.
-- Android notification presentation, an installer UI, automatic updates, and cloud access are not implemented.
+- The monitoring service is Windows-only and the installer is x64-only.
+- The LAN API has no authentication, pairing authorization, TLS, or rate limiting.
+- QR setup uses the PC's current private IP address; automatic mDNS rediscovery is not implemented.
+- A sudden crash can lose the unfinished current history bucket.
+- Windows packages are not yet Authenticode-signed.
+- Updates are installed manually; there is no in-app update checker.
+
+## Documentation
+
+- [API reference](docs/API.md)
+- [Installer and updates](docs/INSTALLER.md)
+- [Security and safe deployment](docs/SECURITY.md)
+- [Release checklist](docs/RELEASING.md)
+- [v0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md)
 
 ## Contributing
 
-Issues and focused pull requests are welcome. Please include tests for behavioral changes, keep the API backward-compatible where practical, and avoid adding telemetry or outbound services without an explicit design discussion and opt-in model.
+Focused issues and pull requests are welcome. Keep the API backward-compatible where practical, add tests for behavioral changes, and do not introduce telemetry or outbound services without an explicit design discussion and opt-in model.
 
-Before opening a pull request, run the build and both test projects shown above. Security concerns should follow [docs/SECURITY.md](docs/SECURITY.md) instead of being disclosed in a public issue.
+Report security concerns privately through GitHub Private Vulnerability Reporting rather than a public issue.
 
 ## License
 
-This repository does not currently contain a license file. Until one is added, copyright law reserves reuse and redistribution rights to the copyright holder; public source availability alone does not grant an open-source license. Choose and add an OSI-approved license before presenting the project as freely reusable open source.
+Copyright © 2026 Schonenberg Developments. Distributed under the [MIT License](LICENSE.txt).

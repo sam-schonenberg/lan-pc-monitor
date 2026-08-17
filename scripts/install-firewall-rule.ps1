@@ -17,15 +17,15 @@ try {
 
     New-NetFirewallRule `
         -DisplayName $ruleName `
-        -Description 'Allows LAN PC Monitor API access from the local subnet on private networks only.' `
+        -Description 'Allows LAN PC Monitor API access from the local subnet on all Windows network profiles.' `
         -Direction Inbound `
         -Action Allow `
         -Protocol TCP `
         -LocalPort $Port `
-        -Profile Private `
+        -Profile Any `
         -RemoteAddress LocalSubnet | Out-Null
 
-    Write-Host "Firewall rule '$ruleName' installed for private local-subnet TCP traffic on port $Port."
+    Write-Host "Firewall rule '$ruleName' installed for local-subnet TCP traffic on all network profiles at port $Port."
     exit 0
 }
 catch {

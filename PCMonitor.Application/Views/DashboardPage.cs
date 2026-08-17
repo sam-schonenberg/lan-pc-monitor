@@ -23,21 +23,28 @@ public sealed class DashboardPage : ContentPage
         _widgetRepository = widgetRepository; _historyRepository = historyRepository;
         this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
 
-        var heading = new Label { Text = "Dashboard", FontSize = 25, FontAttributes = FontAttributes.Bold,
-            VerticalTextAlignment = TextAlignment.Center };
         _editButton.Clicked += (_, _) => ToggleEditMode();
         SemanticProperties.SetDescription(_editButton, "Edit dashboard widgets");
-        var titleRow = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Children = { heading, _editButton } };
-        titleRow.SetColumn(_editButton, 1);
 
-        var machine = new Label { FontSize = 18, FontAttributes = FontAttributes.Bold };
+        var machine = new Label { FontSize = 20, FontAttributes = FontAttributes.Bold,
+            VerticalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.TailTruncation };
         machine.SetBinding(Label.TextProperty, nameof(viewModel.MachineName));
-        var connection = new Label { FontSize = 13, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.End };
+        var connection = new Label { FontSize = 13, FontAttributes = FontAttributes.Bold,
+            HorizontalTextAlignment = TextAlignment.End, VerticalTextAlignment = TextAlignment.Center };
         connection.SetBinding(Label.TextProperty, nameof(viewModel.ConnectionState));
-        var statusRow = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Children = { machine, connection } };
-        statusRow.SetColumn(connection, 1);
         var updated = new Label { FontSize = 12, Opacity = 0.7 };
         updated.SetBinding(Label.TextProperty, nameof(viewModel.LastUpdateText));
+        var header = new Grid
+        {
+            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) },
+            RowDefinitions = { new(GridLength.Auto), new(GridLength.Auto) },
+            ColumnSpacing = 16, RowSpacing = 5,
+            Children = { machine, updated, _editButton, connection }
+        };
+        header.SetRow(updated, 1);
+        header.SetColumn(_editButton, 1);
+        header.SetColumn(connection, 1);
+        header.SetRow(connection, 1);
         var error = new Label { FontSize = 12, TextColor = Colors.DarkOrange };
         error.SetBinding(Label.TextProperty, nameof(viewModel.ErrorMessage));
 
@@ -47,10 +54,10 @@ public sealed class DashboardPage : ContentPage
         SemanticProperties.SetDescription(add, "Add a dashboard widget");
         var emptyAdd = new Button { Text = "+ Add your first widget", HorizontalOptions = LayoutOptions.Center };
         emptyAdd.Clicked += (_, _) => ShowAddWidget();
-        _emptyState = new VerticalStackLayout { Spacing = 12, Padding = new Thickness(20, 40), Children = { _empty, emptyAdd } };
+        _emptyState = new VerticalStackLayout { Spacing = 12, Padding = new Thickness(20, 32), Children = { _empty, emptyAdd } };
 
-        var body = new VerticalStackLayout { Padding = 18, Spacing = 14,
-            Children = { titleRow, statusRow, updated, error, _widgetRows, _emptyState, add } };
+        var body = new VerticalStackLayout { Padding = new Thickness(18, 14, 18, 18), Spacing = 12,
+            Children = { header, error, _widgetRows, _emptyState, add } };
         var refresh = new RefreshView { Content = new ScrollView { Content = body } };
         refresh.SetBinding(RefreshView.CommandProperty, nameof(viewModel.RefreshCommand));
         refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(viewModel.IsRefreshing));

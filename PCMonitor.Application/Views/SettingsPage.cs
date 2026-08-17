@@ -74,12 +74,17 @@ public sealed class SettingsPage : ContentPage
 
     private static View CreateSensorRow()
     {
-        var name = new Label { VerticalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.WordWrap };
+        var name = new Label { FontAttributes = FontAttributes.Bold, LineBreakMode = LineBreakMode.TailTruncation,
+            MaxLines = 1 };
         name.SetBinding(Label.TextProperty, nameof(SensorVisibilityOption.DisplayName));
+        var details = new Label { FontSize = 12, Opacity = 0.7, LineBreakMode = LineBreakMode.TailTruncation,
+            MaxLines = 1 };
+        details.SetBinding(Label.TextProperty, nameof(SensorVisibilityOption.Details));
+        var text = new VerticalStackLayout { Spacing = 2, Children = { name, details } };
         var toggle = new Switch { HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center };
         toggle.SetBinding(Switch.IsToggledProperty, nameof(SensorVisibilityOption.IsVisible), mode: BindingMode.TwoWay);
         var grid = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 12,
-            Children = { name, toggle } };
+            Children = { text, toggle } };
         grid.SetColumn(toggle, 1);
         return Card(grid, new Thickness(0, 0, 0, 8));
     }

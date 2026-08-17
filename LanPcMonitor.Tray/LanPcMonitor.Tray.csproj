@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\LanPcMonitor.ico</ApplicationIcon>
+    <AssemblyTitle>LAN PC Monitor Tray</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>

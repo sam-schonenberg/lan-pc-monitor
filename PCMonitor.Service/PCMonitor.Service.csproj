@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-PCMonitor.Service-b4628d41-b254-4e6f-af01-1563d680db7d</UserSecretsId>
+    <ApplicationIcon>..\assets\branding\LanPcMonitor.ico</ApplicationIcon>
+    <AssemblyTitle>LAN PC Monitor Service</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>

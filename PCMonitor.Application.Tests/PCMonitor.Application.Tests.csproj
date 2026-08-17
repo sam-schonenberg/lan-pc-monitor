@@ -20,6 +20,7 @@
     <Compile Include="..\PCMonitor.Application\Data\Entities\*.cs" Link="Application\Entities\%(Filename)%(Extension)" />
     <Compile Include="..\PCMonitor.Application\Models\Api\ApiDtos.cs" Link="Application\ApiDtos.cs" />
     <Compile Include="..\PCMonitor.Application\Models\SensorChartPoint.cs" Link="Application\SensorChartPoint.cs" />
+    <Compile Include="..\PCMonitor.Application\Models\SensorDisplayText.cs" Link="Application\SensorDisplayText.cs" />
     <Compile Include="..\PCMonitor.Application\Models\DashboardWidgets.cs" Link="Application\DashboardWidgets.cs" />
     <Compile Include="..\PCMonitor.Application\Models\DashboardWidgetLayout.cs" Link="Application\DashboardWidgetLayout.cs" />
     <Compile Include="..\PCMonitor.Application\Services\Storage\HistoryRepository.cs" Link="Application\HistoryRepository.cs" />

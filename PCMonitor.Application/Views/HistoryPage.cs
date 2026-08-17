@@ -77,17 +77,15 @@ public sealed class HistoryPage : ContentPage
         };
         filters.SetColumn(filters.Children[1], 1);
 
-        var sensorType = new Label { FontSize = 15, FontAttributes = FontAttributes.Bold,
+        var sensorName = new Label { FontSize = 15, FontAttributes = FontAttributes.Bold,
             LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1 };
-        sensorType.SetBinding(Label.TextProperty, nameof(_viewModel.ChartSensorType));
-        var sensorHardware = new Label { FontSize = 13, LineBreakMode = LineBreakMode.TailTruncation,
-            MaxLines = 1, Opacity = 0.8 };
-        sensorHardware.SetBinding(Label.TextProperty, nameof(_viewModel.ChartSensorHardware));
-        var sensorName = new Label { FontSize = 13, LineBreakMode = LineBreakMode.TailTruncation,
-            MaxLines = 1, Opacity = 0.8 };
         sensorName.SetBinding(Label.TextProperty, nameof(_viewModel.ChartSensorName));
+        var sensorDetails = new Label { FontSize = 12, LineBreakMode = LineBreakMode.TailTruncation,
+            MaxLines = 1, Opacity = 0.8 };
+        sensorDetails.SetBinding(Label.TextProperty,
+            $"{nameof(_viewModel.SelectedSensor)}.{nameof(HistorySensorOption.Details)}");
         var chartTitle = new VerticalStackLayout { Spacing = 2,
-            Children = { sensorType, sensorHardware, sensorName } };
+            Children = { sensorName, sensorDetails } };
         var chartRange = new Label { FontSize = 15, FontAttributes = FontAttributes.Bold,
             HorizontalOptions = LayoutOptions.Fill, HorizontalTextAlignment = TextAlignment.End,
             VerticalTextAlignment = TextAlignment.Center };

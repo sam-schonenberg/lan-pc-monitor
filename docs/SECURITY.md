@@ -28,10 +28,10 @@ The supplied installation script creates one inbound rule:
 | Action | Allow |
 | Protocol | TCP |
 | Local port | Configured service port |
-| Windows profile | Private only |
+| Windows profile | All (Private, Public, and Domain) |
 | Remote addresses | `LocalSubnet` only |
 
-The rule is defined in [`scripts/install-firewall-rule.ps1`](../scripts/install-firewall-rule.ps1). It does not add a Public-profile exception. Administrative privileges are required to create or remove it.
+The rule is defined in [`scripts/install-firewall-rule.ps1`](../scripts/install-firewall-rule.ps1). It permits a phone on the same local subnet even when Windows classifies the PC network as Public. Administrative privileges are required to create or remove it.
 
 ### Client endpoint validation
 
@@ -67,10 +67,9 @@ Consequently, any device that can reach the API can read its monitoring data, a 
 
 ## Safe deployment checklist
 
-- Set the Windows network profile to **Private** only on a network you trust.
+- Prefer trusted Private networks. On a Public network, assume every device on the local subnet is untrusted and may be able to reach the API.
 - Do not expose the port through router forwarding, a reverse proxy, a tunnel, VPN publication, or a broad firewall rule.
-- Do not use the service on public Wi-Fi, shared untrusted networks, or guest networks.
-- Do not change a Public network to Private solely to make the API reachable.
+- Disable the service when using public Wi-Fi if local monitoring access is not required.
 - Keep Windows, .NET, LibreHardwareMonitor, and dependencies updated.
 - Review changes to `appsettings.json` and the firewall scripts before deployment.
 - Remove the firewall rule or stop/disable the service when LAN access is no longer wanted.
