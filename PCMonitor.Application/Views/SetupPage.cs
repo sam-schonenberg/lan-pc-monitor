@@ -28,11 +28,16 @@ public sealed class SetupPage : ContentPage
             await Navigation.PushModalAsync(new NavigationPage(new QrScannerPage(viewModel.ApplyScannedAddressAsync)));
         };
         var save = new Button { Text = "Save and Continue" }; save.SetBinding(Button.CommandProperty, nameof(viewModel.SaveCommand));
+        var github = new Button { Text = "Get the Windows service on GitHub" };
+        github.Clicked += async (_, _) => await Launcher.Default.OpenAsync("https://github.com/sam-schonenberg/lan-pc-monitor");
         Content = new ScrollView { Content = new VerticalStackLayout
         {
             Padding = 28, Spacing = 18, VerticalOptions = LayoutOptions.Center,
             Children = { new Label { Text = "LAN PC Monitor", FontSize = 30, FontAttributes = FontAttributes.Bold },
-                new Label { Text = "PC address" }, address, scan, test, status, save }
+                new Label { Text = "PC address" }, address, scan, test, status, save,
+                new BoxView { HeightRequest = 1, Color = Colors.Gray, Margin = new Thickness(0, 8) },
+                new Label { Text = "This app requires the LAN PC Monitor service on a Windows PC.", FontSize = 13 },
+                github }
         }};
         viewModel.Saved += (_, _) => Microsoft.Maui.Controls.Application.Current!.Windows[0].Page = services.GetRequiredService<AppShell>();
     }

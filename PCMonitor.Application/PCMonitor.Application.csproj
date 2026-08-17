@@ -28,13 +28,13 @@
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
 		<!-- Display name -->
-		<ApplicationTitle>PCMonitor.Application</ApplicationTitle>
+		<ApplicationTitle>LAN PC Monitor</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.pcmonitor.application</ApplicationId>
+		<ApplicationId>com.samschonenberg.lanpcmonitor</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->

@@ -6,7 +6,7 @@ internal static class TrayConfiguration
 {
     public static int GetPort()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "appsettings.json"));
         try
         {
             using var stream = File.OpenRead(path);

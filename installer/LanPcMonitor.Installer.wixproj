@@ -1,0 +1,25 @@
+<Project Sdk="WixToolset.Sdk/6.0.1">
+  <PropertyGroup>
+    <InstallerVersion Condition="'$(InstallerVersion)' == ''">0.1.0</InstallerVersion>
+    <InstallerPayloadPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\artifacts\publish\win-x64'))</InstallerPayloadPath>
+    <ServicePayloadPath>$(InstallerPayloadPath)\Service</ServicePayloadPath>
+    <TrayPayloadPath>$(InstallerPayloadPath)\Tray</TrayPayloadPath>
+    <OutputName>LanPcMonitor-$(InstallerVersion)-win-x64</OutputName>
+    <OutputPath>$(MSBuildProjectDirectory)\..\artifacts\installer\</OutputPath>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(InstallerVersion);ServicePublishDir=$(ServicePayloadPath);TrayPublishDir=$(TrayPayloadPath)</DefineConstants>
+    <InstallerPlatform>x64</InstallerPlatform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="6.0.1" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.1" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.1" />
+  </ItemGroup>
+
+  <Target Name="PublishInstallerPayload" BeforeTargets="CoreCompile" Condition="'$(SkipInstallerPublish)' != 'true'">
+    <RemoveDir Directories="$(InstallerPayloadPath)" />
+    <MakeDir Directories="$(ServicePayloadPath);$(TrayPayloadPath)" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\PCMonitor.Service\PCMonitor.Service.csproj&quot; --configuration $(Configuration) --runtime win-x64 --self-contained true --output &quot;$(ServicePayloadPath)&quot; -p:Version=$(InstallerVersion)" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\LanPcMonitor.Tray\LanPcMonitor.Tray.csproj&quot; --configuration $(Configuration) --runtime win-x64 --self-contained true --output &quot;$(TrayPayloadPath)&quot; -p:Version=$(InstallerVersion)" />
+  </Target>
+</Project>

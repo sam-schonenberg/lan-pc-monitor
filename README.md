@@ -47,7 +47,7 @@ LAN PC Monitor is designed around an explicit trusted-LAN boundary:
 
 Package restore, SDK installation, and source links in this README may naturally use the internet during development. That is separate from the running monitoring service, which has no outbound network integration.
 
-For the full threat model, limitations, and responsible-reporting guidance, see [Security](docs/SECURITY.md). For every route, query parameter, response shape, and synchronization rule, see the [API reference](docs/API.md).
+For the full threat model, limitations, and responsible-reporting guidance, see [Security](docs/SECURITY.md). For every route, query parameter, response shape, and synchronization rule, see the [API reference](docs/API.md). Packaging and upgrade behavior is documented in [Installer and updates](docs/INSTALLER.md).
 
 ## Requirements
 
@@ -129,7 +129,19 @@ Build only the Android client with:
 dotnet build .\PCMonitor.Application\PCMonitor.Application.csproj -f net10.0-android
 ```
 
-## Publish and install
+## Build the Windows installer
+
+Build the self-contained x64 MSI and its SHA-256 checksum with:
+
+```powershell
+.\scripts\build-installer.ps1 -Version 0.1.0
+```
+
+The MSI installs the service and tray companion, configures restart-on-failure, creates the Private/LocalSubnet firewall rule, adds a Start Menu shortcut, and supports safe major upgrades. See [Installer and updates](docs/INSTALLER.md) for behavior, release testing, data preservation, signing, and update policy.
+
+## Manual publish and script installation
+
+The maintenance scripts remain available for development and troubleshooting when an MSI is not desired.
 
 Publish the service and optional tray companion into one directory:
 

@@ -1,0 +1,162 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:firewall="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="LAN PC Monitor"
+           Manufacturer="Sam Schonenberg"
+           Version="$(ProductVersion)"
+           UpgradeCode="1D39FE60-B2EE-4E67-87DA-9356D399F294"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes"
+           Language="1033">
+
+    <SummaryInformation Description="LAN-only Windows hardware monitoring service and tray companion." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of LAN PC Monitor is already installed."
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/sam-schonenberg/lan-pc-monitor" />
+    <Property Id="ARPPRODUCTICON" Value="LanPcMonitorIcon" />
+    <Icon Id="LanPcMonitorIcon" SourceFile="$(sys.SOURCEFILEDIR)Assets\LanPcMonitor.ico" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)Assets\Banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)Assets\Dialog.bmp" />
+    <WixVariable Id="WixUIBackgroundBmp" Value="$(sys.SOURCEFILEDIR)Assets\Dialog.bmp" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
+              Value="Start the monitoring service automatically with Windows" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="http://localhost:5005/setup" />
+    <CustomAction Id="OpenPairingPage"
+                  BinaryRef="Wix4UtilCA_X64"
+                  DllEntry="WixShellExec"
+                  Impersonate="yes" />
+    <CustomAction Id="DisableServiceAutoStartup"
+                  FileRef="TrayExecutable"
+                  ExeCommand="--disable-service-auto-start"
+                  Execute="immediate"
+                  Return="check"
+                  Impersonate="yes" />
+    <UI>
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="DisableServiceAutoStartup"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX &lt;&gt; 1 AND NOT Installed"
+               Order="1" />
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="OpenPairingPage"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed"
+               Order="2" />
+    </UI>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="LAN PC Monitor">
+        <Directory Id="SERVICEDIRECTORY" Name="Service" />
+        <Directory Id="TRAYDIRECTORY" Name="Tray" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="LAN PC Monitor" />
+    </StandardDirectory>
+    <StandardDirectory Id="StartupFolder" />
+
+    <Feature Id="MainFeature" Title="LAN PC Monitor" Level="1">
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="TrayComponent" />
+      <ComponentRef Id="ConfigurationComponent" />
+      <ComponentRef Id="FirewallComponent" />
+      <ComponentRef Id="ProgramMenuFolderComponent" />
+      <Files Include="$(ServicePublishDir)\**"
+             Directory="SERVICEDIRECTORY">
+        <Exclude Files="$(ServicePublishDir)\PCMonitor.Service.exe" />
+        <Exclude Files="$(ServicePublishDir)\appsettings.json" />
+        <Exclude Files="$(ServicePublishDir)\**\*.pdb" />
+      </Files>
+      <Files Include="$(TrayPublishDir)\**"
+             Directory="TRAYDIRECTORY">
+        <Exclude Files="$(TrayPublishDir)\LanPcMonitor.Tray.exe" />
+        <Exclude Files="$(TrayPublishDir)\**\*.pdb" />
+      </Files>
+    </Feature>
+
+    <Component Id="ServiceComponent" Directory="SERVICEDIRECTORY" Guid="A623F716-D44F-4F9A-BF1F-0F26BECE400F">
+      <File Id="ServiceExecutable" Source="$(ServicePublishDir)\PCMonitor.Service.exe" KeyPath="yes" />
+      <ServiceInstall Id="PCMonitorServiceInstall"
+                      Name="PCMonitor"
+                      DisplayName="LAN PC Monitor"
+                      Description="Monitors PC hardware sensors and exposes them to the private local network."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal">
+        <util:ServiceConfig FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            ResetPeriodInDays="1"
+                            RestartServiceDelayInSeconds="5" />
+      </ServiceInstall>
+      <ServiceControl Id="PCMonitorServiceControl"
+                      Name="PCMonitor"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+
+    <Component Id="TrayComponent" Directory="TRAYDIRECTORY" Guid="E86FD389-21E7-4FD3-ACD4-799612873E34">
+      <File Id="TrayExecutable" Source="$(TrayPublishDir)\LanPcMonitor.Tray.exe" KeyPath="yes">
+        <Shortcut Id="TrayStartMenuShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="LAN PC Monitor"
+                  Description="Open the LAN PC Monitor tray companion."
+                  WorkingDirectory="TRAYDIRECTORY"
+                  Advertise="yes" />
+        <Shortcut Id="TrayStartupShortcut"
+                  Directory="StartupFolder"
+                  Name="LAN PC Monitor"
+                  Description="Start the LAN PC Monitor tray companion when a user signs in."
+                  WorkingDirectory="TRAYDIRECTORY"
+                  Advertise="yes" />
+      </File>
+    </Component>
+
+    <Component Id="ConfigurationComponent"
+               Directory="INSTALLFOLDER"
+               Guid="DA82A58F-2919-4C22-9097-1B49F57FB51C"
+               NeverOverwrite="yes"
+               Permanent="yes">
+      <File Id="AppSettingsFile" Source="$(ServicePublishDir)\appsettings.json" KeyPath="yes" />
+    </Component>
+
+    <Component Id="FirewallComponent" Directory="INSTALLFOLDER" Guid="5309CCF1-49A8-4713-A3A0-F1A9AB88BBC1">
+      <RegistryValue Root="HKLM"
+                     Key="Software\LAN PC Monitor"
+                     Name="FirewallRuleInstalled"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+      <firewall:FirewallException Id="LanApiFirewallRule"
+                                  Name="LAN PC Monitor - API"
+                                  Description="Allows LAN PC Monitor API access from the local subnet on private networks only."
+                                  Port="5005"
+                                  Protocol="tcp"
+                                  Profile="private"
+                                  Scope="localSubnet"
+                                  IgnoreFailure="no" />
+    </Component>
+
+    <Component Id="ProgramMenuFolderComponent" Directory="ApplicationProgramsFolder" Guid="770B7243-9059-46AA-BC0A-A30130FF3326">
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\LAN PC Monitor"
+                     Name="StartMenuFolder"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

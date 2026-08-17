@@ -12,6 +12,10 @@ using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile(
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "appsettings.json")),
+    optional: true,
+    reloadOnChange: true);
 
 if (WindowsServiceHelpers.IsWindowsService())
 {

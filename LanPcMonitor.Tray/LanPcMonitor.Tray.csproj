@@ -13,13 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\scripts\**\*">
-      <Link>scripts\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-    <Content Include="..\PCMonitor.Service\appsettings.json">
-      <Link>appsettings.json</Link>
+    <Content Include="..\scripts\_common.bat;..\scripts\start-service.bat;..\scripts\stop-service.bat;..\scripts\restart-service.bat;..\scripts\enable-service.bat;..\scripts\disable-service.bat">
+      <Link>scripts\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

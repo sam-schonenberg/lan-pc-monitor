@@ -4,4 +4,5 @@
   <Project Path="PCMonitor.Service.Tests/PCMonitor.Service.Tests.csproj" />
   <Project Path="PCMonitor.Application/PCMonitor.Application.csproj" />
   <Project Path="PCMonitor.Application.Tests/PCMonitor.Application.Tests.csproj" />
+  <Project Path="installer/LanPcMonitor.Installer.wixproj" />
 </Solution>

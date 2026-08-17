@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="493" height="312" viewBox="0 0 493 312">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.58" stop-color="#102a4c"/>
+      <stop offset="1" stop-color="#0e7490"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.7" cy="0.35" r="0.65">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="168" height="312" fill="url(#bg)"/>
+  <rect width="168" height="312" fill="url(#glow)"/>
+  <rect x="168" width="325" height="312" fill="#f8fafc"/>
+  <rect x="167" width="1" height="312" fill="#cbd5e1"/>
+  <g transform="translate(30 55)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="108" height="75" rx="10" stroke="#ecfeff" stroke-width="5"/>
+    <path d="M35 102h38M54 75v27" stroke="#ecfeff" stroke-width="5"/>
+    <path d="M15 55l20-21 17 16 24-31 17 17" stroke="#67e8f9" stroke-width="6"/>
+    <circle cx="39" cy="37" r="5" fill="#67e8f9" stroke="none"/>
+    <circle cx="57" cy="55" r="5" fill="#67e8f9" stroke="none"/>
+    <circle cx="83" cy="21" r="5" fill="#67e8f9" stroke="none"/>
+  </g>
+  <text x="22" y="205" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">LAN PC Monitor</text>
+  <text x="23" y="230" fill="#a5f3fc" font-family="Segoe UI, Arial, sans-serif" font-size="9">PRIVATE NETWORK MONITORING</text>
+  <rect x="23" y="249" width="76" height="2" fill="#22d3ee"/>
+  <text x="23" y="274" fill="#cffafe" font-family="Segoe UI, Arial, sans-serif" font-size="8" letter-spacing="1">SECURE  •  LOCAL</text>
+</svg>

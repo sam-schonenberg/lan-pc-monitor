@@ -13,11 +13,4 @@
     <PackageReference Include="QRCoder" Version="1.8.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\scripts\**\*">
-      <Link>scripts\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-  </ItemGroup>
 </Project>

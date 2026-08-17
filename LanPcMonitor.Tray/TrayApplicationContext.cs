@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using LanPcMonitor.Tray.Services;
+using Microsoft.Win32;
 
 namespace LanPcMonitor.Tray;
 
@@ -11,8 +12,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _startItem;
     private readonly ToolStripMenuItem _stopItem;
     private readonly ToolStripMenuItem _restartItem;
-    private readonly ToolStripMenuItem _enableItem;
-    private readonly ToolStripMenuItem _disableItem;
+    private readonly ToolStripMenuItem _serviceStartupItem;
     private readonly ServiceStatusReader _statusReader = new(ServiceName);
     private readonly MaintenanceScriptRunner _scriptRunner = new();
 
@@ -24,8 +24,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem = CreateAction("Start Service", "start-service.bat");
         _stopItem = CreateAction("Stop Service", "stop-service.bat");
         _restartItem = CreateAction("Restart Service", "restart-service.bat");
-        _enableItem = CreateAction("Enable Automatic Startup", "enable-service.bat");
-        _disableItem = CreateAction("Disable Service", "disable-service.bat");
+        _serviceStartupItem = new ToolStripMenuItem("Service / Auto Startup");
+        _serviceStartupItem.Click += ToggleServiceStartup;
 
         menu.Items.AddRange([
             title,
@@ -35,14 +35,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _stopItem,
             _restartItem,
             new ToolStripSeparator(),
-            _enableItem,
-            _disableItem,
+            _serviceStartupItem,
             new ToolStripSeparator(),
             new ToolStripMenuItem("Open Monitoring API", null, (_, _) => OpenUrl("api/sensors")),
             new ToolStripMenuItem("Open Status Endpoint", null, (_, _) => OpenUrl("status")),
             new ToolStripMenuItem("Open Setup & Pairing", null, (_, _) => OpenUrl("setup")),
             new ToolStripSeparator(),
-            new ToolStripMenuItem("Uninstall Service", null, UninstallService),
+            new ToolStripMenuItem("Uninstall LAN PC Monitor…", null, UninstallApplication),
             new ToolStripSeparator(),
             new ToolStripMenuItem("Exit Tray App", null, (_, _) => ExitThread())
         ]);
@@ -78,18 +77,111 @@ internal sealed class TrayApplicationContext : ApplicationContext
         RefreshStatus();
     }
 
-    private async void UninstallService(object? sender, EventArgs e)
+    private void UninstallApplication(object? sender, EventArgs e)
     {
         var answer = MessageBox.Show(
-            "Are you sure you want to uninstall LAN PC Monitor?\n\nThis will stop and remove the Windows service and its firewall rule.",
+            "Are you sure you want to uninstall LAN PC Monitor?\n\n" +
+            "Windows Installer will remove the application, service, firewall rule, and shortcuts. " +
+            "Your configuration and monitoring history will be preserved.",
             "Uninstall LAN PC Monitor",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning,
             MessageBoxDefaultButton.Button2);
-        if (answer == DialogResult.Yes)
+        if (answer != DialogResult.Yes)
         {
-            await RunScriptAsync("uninstall-service.bat");
+            return;
         }
+
+        try
+        {
+            var productCode = FindInstalledProductCode();
+            if (productCode is null)
+            {
+                MessageBox.Show(
+                    "LAN PC Monitor could not be found in Windows Installed Apps. " +
+                    "You can still uninstall it from Windows Settings > Apps > Installed apps.",
+                    "Uninstall LAN PC Monitor",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "msiexec.exe",
+                Arguments = $"/x {productCode}",
+                UseShellExecute = true
+            });
+            if (process is null)
+            {
+                throw new InvalidOperationException("Windows Installer could not be started.");
+            }
+
+            ExitThread();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"Could not start Windows Installer: {exception.Message}",
+                "Uninstall LAN PC Monitor",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private static string? FindInstalledProductCode()
+    {
+        const string uninstallRegistryPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+        foreach (var registryView in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, registryView);
+            using var uninstallKey = localMachine.OpenSubKey(uninstallRegistryPath);
+            if (uninstallKey is null)
+            {
+                continue;
+            }
+
+            foreach (var subKeyName in uninstallKey.GetSubKeyNames())
+            {
+                using var productKey = uninstallKey.OpenSubKey(subKeyName);
+                if (productKey is null ||
+                    !string.Equals(productKey.GetValue("DisplayName") as string, "LAN PC Monitor",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    productKey.GetValue("WindowsInstaller") is not int windowsInstaller || windowsInstaller != 1 ||
+                    !Guid.TryParse(subKeyName, out var productCode))
+                {
+                    continue;
+                }
+
+                return productCode.ToString("B");
+            }
+        }
+
+        return null;
+    }
+
+    private async void ToggleServiceStartup(object? sender, EventArgs e)
+    {
+        ServiceState state;
+        try
+        {
+            state = _statusReader.GetState();
+        }
+        catch
+        {
+            state = ServiceState.Unknown;
+        }
+
+        if (state is ServiceState.NotInstalled or ServiceState.Unknown)
+        {
+            RefreshStatus();
+            return;
+        }
+
+        var scriptName = state == ServiceState.Disabled
+            ? "enable-service.bat"
+            : "disable-service.bat";
+        await RunScriptAsync(scriptName);
     }
 
     private void RefreshStatus()
@@ -112,8 +204,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem.Enabled = installed && state == ServiceState.Stopped;
         _stopItem.Enabled = installed && state is ServiceState.Running or ServiceState.StartPending;
         _restartItem.Enabled = installed && state == ServiceState.Running;
-        _enableItem.Enabled = installed && state == ServiceState.Disabled;
-        _disableItem.Enabled = installed && state != ServiceState.Disabled && !pending;
+        _serviceStartupItem.Text = state == ServiceState.Disabled
+            ? "Enable Service / Auto Startup"
+            : "Disable Service / Auto Startup";
+        _serviceStartupItem.Enabled = installed && !pending && state != ServiceState.Unknown;
     }
 
     private void SetActionsEnabled(bool enabled)
@@ -121,8 +215,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem.Enabled = enabled;
         _stopItem.Enabled = enabled;
         _restartItem.Enabled = enabled;
-        _enableItem.Enabled = enabled;
-        _disableItem.Enabled = enabled;
+        _serviceStartupItem.Enabled = enabled;
     }
 
     private static string FormatState(ServiceState state) => state switch
