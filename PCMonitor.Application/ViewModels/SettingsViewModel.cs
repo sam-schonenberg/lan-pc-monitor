@@ -5,6 +5,7 @@ using PCMonitor.Application.Models;
 using PCMonitor.Application.Services.Api;
 using PCMonitor.Application.Services.Storage;
 using PCMonitor.Application.Services.Sync;
+using PCMonitor.Application.Services.Notifications;
 
 namespace PCMonitor.Application.ViewModels;
 
@@ -12,7 +13,8 @@ public partial class SettingsViewModel(
     IAppSettingsService settings,
     MonitorApiClient api,
     HistoryRepository historyRepository,
-    HistorySyncService historySync) : ObservableObject
+    HistorySyncService historySync,
+    NotificationRegistrationService notifications) : ObservableObject
 {
     public ObservableCollection<SensorVisibilityOption> Sensors { get; } = [];
     [ObservableProperty] public partial string Endpoint { get; set; } = string.Empty;
@@ -22,6 +24,10 @@ public partial class SettingsViewModel(
     [ObservableProperty] public partial double SynchronizationProgress { get; set; }
     [ObservableProperty] public partial string SynchronizationStatus { get; set; } = "Ready to synchronize";
     [ObservableProperty] public partial string LastSynchronization { get; set; } = "Never synchronized";
+    [ObservableProperty] public partial bool NotificationsEnabled { get; set; }
+    [ObservableProperty] public partial bool IsChangingNotifications { get; set; }
+    [ObservableProperty] public partial string NotificationStatus { get; set; } = "Checking notification support…";
+    public string NotificationButtonText => NotificationsEnabled ? "Disable notifications" : "Enable notifications";
     public event EventHandler? ChangeRequested;
 
     [RelayCommand]
@@ -30,6 +36,11 @@ public partial class SettingsViewModel(
         Endpoint = await settings.GetApiBaseUrlAsync() ?? "Not configured";
         var lastSync = await settings.GetLastHistorySyncAsync();
         LastSynchronization = lastSync is null ? "Never synchronized" : $"Last synchronized {FormatTimestamp(lastSync.Value)}";
+        NotificationsEnabled = await settings.GetNotificationsEnabledAsync();
+        OnPropertyChanged(nameof(NotificationButtonText));
+        NotificationStatus = notifications.IsAvailable
+            ? NotificationsEnabled ? "Critical alerts are registered for this device." : "Notifications are off."
+            : "Firebase configuration is not included in this app build.";
         IsLoadingSensors = true;
         try
         {
@@ -82,7 +93,36 @@ public partial class SettingsViewModel(
     }
     [RelayCommand] private async Task ChangePcAsync()
     {
+        if (NotificationsEnabled)
+        {
+            try { await notifications.DisableAsync(); } catch { }
+        }
         await settings.ClearApiBaseUrlAsync(); ChangeRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private async Task ToggleNotificationsAsync()
+    {
+        if (IsChangingNotifications) return;
+        IsChangingNotifications = true;
+        try
+        {
+            if (NotificationsEnabled)
+            {
+                await notifications.DisableAsync();
+                NotificationsEnabled = false;
+                NotificationStatus = "Notifications disabled for this device.";
+            }
+            else
+            {
+                var result = await notifications.EnableAsync();
+                NotificationsEnabled = result.Enabled;
+                NotificationStatus = result.Message;
+            }
+            OnPropertyChanged(nameof(NotificationButtonText));
+        }
+        catch (Exception exception) { NotificationStatus = $"Could not update notifications: {exception.Message}"; }
+        finally { IsChangingNotifications = false; }
     }
 
     private static string FormatTimestamp(DateTimeOffset timestamp)

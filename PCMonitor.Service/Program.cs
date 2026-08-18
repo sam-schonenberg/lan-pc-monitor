@@ -7,6 +7,8 @@ using PCMonitor.Service.Services;
 using PCMonitor.Service.SessionDetection;
 using PCMonitor.Service.History;
 using PCMonitor.Service.Alerts;
+using PCMonitor.Service.Notifications;
+using PCMonitor.Service.Api;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
@@ -26,6 +28,7 @@ builder.Services.Configure<SessionDetectionOptions>(builder.Configuration.GetSec
 builder.Services.Configure<HistoricalMonitoringOptions>(builder.Configuration.GetSection(HistoricalMonitoringOptions.SectionName));
 builder.Services.Configure<ProcessMonitoringOptions>(builder.Configuration.GetSection(ProcessMonitoringOptions.SectionName));
 builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
+builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
@@ -36,6 +39,16 @@ builder.Services.AddResponseCompression(options =>
     options.EnableForHttps = true;
     options.Providers.Add<BrotliCompressionProvider>();
     options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info.Title = "LAN PC Monitor API";
+        document.Info.Version = "v1";
+        document.Info.Description = "Read PC hardware telemetry, retained history, sessions, alerts, and manage optional mobile push registrations on a trusted LAN.";
+        return Task.CompletedTask;
+    });
 });
 builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
@@ -51,6 +64,12 @@ builder.Services.AddSingleton<HistoricalSensorAggregator>();
 builder.Services.AddSingleton<LiveEventHub>();
 builder.Services.AddSingleton<AlertStore>();
 builder.Services.AddSingleton<AlertEvaluator>();
+builder.Services.AddSingleton<DeviceRegistrationStore>();
+builder.Services.AddHttpClient<IPushNotificationProvider, FcmPushNotificationProvider>();
+builder.Services.AddSingleton<NotificationDispatcher>();
+builder.Services.AddSingleton<INotificationDispatcher>(serviceProvider =>
+    serviceProvider.GetRequiredService<NotificationDispatcher>());
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<NotificationDispatcher>());
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<HistoricalHistoryStore>());
 builder.Services.AddHostedService<ProcessMonitoringService>();
 builder.Services.AddHostedService<SensorMonitoringService>();
@@ -61,76 +80,19 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 var app = builder.Build();
 app.UseResponseCompression();
 app.UseWebSockets();
-
-app.MapGet("/status", () => new ServiceStatus(
-    "ok",
-    "PCMonitor",
-    Environment.MachineName,
-    DateTimeOffset.UtcNow));
-
-app.MapGet("/api/sensors", (SensorSnapshotStore snapshots) => snapshots.Current);
-app.MapGet("/api/sensors/catalog", (HistoricalHistoryStore history) => Results.Ok(history.GetCatalog()));
-app.MapGet("/api/history/manifest", (HttpContext context, HistoricalHistoryStore history) =>
-{
-    var manifest = history.GetManifest();
-    var tag = $"\"{manifest.StreamId:N}-{manifest.CatalogVersion}-{manifest.NewestSequence ?? 0}-{manifest.BucketCount}\"";
-    context.Response.Headers.ETag = tag;
-    context.Response.Headers.CacheControl = "no-cache";
-    if (context.Request.Headers.IfNoneMatch.Any(value => value == tag))
-        return Results.StatusCode(StatusCodes.Status304NotModified);
-    return Results.Ok(manifest);
-});
-app.MapGet("/api/session", (LoadSessionDetector detector) => detector.GetCurrent());
-app.MapGet("/api/session/last", (LoadSessionDetector detector) => detector.GetLast());
-app.MapGet("/api/alerts", (
-    DateTimeOffset? from,
-    AlertSeverity? severity,
-    AlertStore alerts) => Results.Ok(alerts.Query(from, severity)));
-app.MapGet("/api/history", (
-    DateTimeOffset? from,
-    DateTimeOffset? to,
-    long? afterSequence,
-    long? beforeSequence,
-    int? limit,
-    string? resolution,
-    int[]? sensorId,
-    Guid? sessionId,
-    HistoricalHistoryStore history) =>
-{
-    if (from is not null && to is not null && from >= to)
-    {
-        return Results.BadRequest(new { error = "'from' must be earlier than 'to'." });
-    }
-
-    var parsedResolution = resolution?.ToLowerInvariant() switch
-    {
-        null or "minute" => HistoryResolution.Minute,
-        "hour" => HistoryResolution.Hour,
-        "day" => HistoryResolution.Day,
-        _ => (HistoryResolution?)null
-    };
-    if (parsedResolution is null)
-    {
-        return Results.BadRequest(new { error = "'resolution' must be minute, hour, or day." });
-    }
-    if (afterSequence < 0 || beforeSequence < 0 || limit <= 0)
-    {
-        return Results.BadRequest(new { error = "'afterSequence' cannot be negative and 'limit' must be positive." });
-    }
-
-    return Results.Ok(history.QueryCompact(from, to, afterSequence, limit, parsedResolution.Value,
-        sensorId, sessionId, beforeSequence));
-});
+app.MapOpenApi("/openapi/{documentName}.json");
+app.MapOpenApi("/openapi/{documentName}.yaml");
+app.MapPublicApi();
 
 app.MapGet("/setup", (SetupPageService setupPage) => Results.Content(
     setupPage.CreateHtml(),
-    "text/html; charset=utf-8"));
+    "text/html; charset=utf-8")).ExcludeFromDescription();
 
 app.MapGet("/setup/qr.svg", (SetupPageService setupPage) => Results.Content(
     setupPage.CreateQrSvg(),
-    "image/svg+xml; charset=utf-8"));
+    "image/svg+xml; charset=utf-8")).ExcludeFromDescription();
 
-app.Map("/ws/sensors", async (HttpContext context, SensorSnapshotStore snapshots, LiveEventHub events,
+var sensorWebSocketHandler = async (HttpContext context, SensorSnapshotStore snapshots, LiveEventHub events,
     ILoggerFactory loggerFactory) =>
 {
     var logger = loggerFactory.CreateLogger("SensorWebSocket");
@@ -176,7 +138,9 @@ app.Map("/ws/sensors", async (HttpContext context, SensorSnapshotStore snapshots
     {
         logger.LogInformation("WebSocket client disconnected from {RemoteAddress}", context.Connection.RemoteIpAddress);
     }
-});
+};
+app.MapGet("/api/v1/ws/sensors", sensorWebSocketHandler).ExcludeFromDescription();
+app.MapGet("/ws/sensors", sensorWebSocketHandler).ExcludeFromDescription();
 
 app.Logger.LogInformation("PCMonitor starting on port {Port}", port);
 await app.RunAsync();

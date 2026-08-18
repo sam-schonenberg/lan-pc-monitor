@@ -72,3 +72,7 @@ $RECYCLE.BIN/
 *.swp
 *~
 .codex-remote-attachments/
+
+# Firebase client configuration is environment-specific.
+PCMonitor.Application/Platforms/Android/google-services.json
+PCMonitor.Application/Platforms/iOS/GoogleService-Info.plist

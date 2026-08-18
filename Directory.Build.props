@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
     <!-- Keep all .NET applications aligned with the GitHub release tag. -->
-    <VersionPrefix>0.1.1</VersionPrefix>
-    <AssemblyVersion>0.1.1.0</AssemblyVersion>
-    <FileVersion>0.1.1.0</FileVersion>
+    <VersionPrefix>0.1.2</VersionPrefix>
+    <AssemblyVersion>0.1.2.0</AssemblyVersion>
+    <FileVersion>0.1.2.0</FileVersion>
     <Company>Schonenberg Developments</Company>
     <Authors>Schonenberg Developments</Authors>
     <Product>LAN PC Monitor</Product>

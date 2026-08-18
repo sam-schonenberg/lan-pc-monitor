@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PCMonitor.Application.Services.Storage;
 using PCMonitor.Application.Services.Sync;
 using PCMonitor.Application.Views;
+using PCMonitor.Application.Services.Notifications;
 
 namespace PCMonitor.Application;
 
@@ -10,19 +11,25 @@ public partial class App : Microsoft.Maui.Controls.Application
     private readonly IServiceProvider _services;
     private readonly IAppSettingsService _settings;
     private readonly ForegroundHistorySyncCoordinator _foregroundSync;
+    private readonly NotificationRegistrationService _notifications;
     public App(IServiceProvider services, IAppSettingsService settings,
-        ForegroundHistorySyncCoordinator foregroundSync)
+        ForegroundHistorySyncCoordinator foregroundSync, NotificationRegistrationService notifications)
     {
         InitializeComponent();
         _services = services;
         _settings = settings;
         _foregroundSync = foregroundSync;
+        _notifications = notifications;
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(new ContentPage { Content = new ActivityIndicator { IsRunning = true, VerticalOptions = LayoutOptions.Center } });
-        window.Activated += (_, _) => _ = _foregroundSync.SynchronizeAsync(window);
+        window.Activated += (_, _) =>
+        {
+            _ = _foregroundSync.SynchronizeAsync(window);
+            _ = RefreshNotificationsAsync();
+        };
         _ = SelectInitialPageAsync(window);
         return window;
     }
@@ -54,5 +61,11 @@ public partial class App : Microsoft.Maui.Controls.Application
                 }
             });
         }
+    }
+
+    private async Task RefreshNotificationsAsync()
+    {
+        try { await _notifications.RefreshAsync(); }
+        catch { /* Registration will be retried the next time the app becomes active. */ }
     }
 }

@@ -12,6 +12,9 @@ public interface IAppSettingsService
     Task SetSensorHiddenAsync(string sensorId, bool hidden);
     Task<DateTimeOffset?> GetLastHistorySyncAsync();
     Task SetLastHistorySyncAsync(DateTimeOffset timestamp);
+    Task<bool> GetNotificationsEnabledAsync();
+    Task SetNotificationsEnabledAsync(bool enabled);
+    Task<string> GetNotificationInstallationIdAsync();
 }
 public sealed class AppSettingsService(AppDatabase database) : IAppSettingsService
 {
@@ -19,6 +22,9 @@ public sealed class AppSettingsService(AppDatabase database) : IAppSettingsServi
     private const string HistorySensorKey = "History.SelectedSensor";
     private const string HiddenSensorsKey = "Sensors.Hidden";
     private const string LastHistorySyncKey = "History.LastSuccessfulSync";
+    private const string NotificationsEnabledKey = "Notifications.Enabled";
+    private const string NotificationInstallationIdKey = "Notifications.InstallationId";
+    private readonly SemaphoreSlim _installationIdLock = new(1, 1);
     private readonly SemaphoreSlim _hiddenSensorsLock = new(1, 1);
     public async Task<string?> GetApiBaseUrlAsync() => (await (await database.GetConnectionAsync()).FindAsync<AppSettingEntity>(ApiBaseUrlKey))?.Value;
     public async Task SetApiBaseUrlAsync(string url) => await SetAsync(ApiBaseUrlKey, url);
@@ -55,6 +61,25 @@ public sealed class AppSettingsService(AppDatabase database) : IAppSettingsServi
     }
     public async Task SetLastHistorySyncAsync(DateTimeOffset timestamp) =>
         await SetAsync(LastHistorySyncKey, timestamp.ToUniversalTime().ToString("O"));
+    public async Task<bool> GetNotificationsEnabledAsync() => bool.TryParse(
+        (await (await database.GetConnectionAsync()).FindAsync<AppSettingEntity>(NotificationsEnabledKey))?.Value,
+        out var enabled) && enabled;
+    public async Task SetNotificationsEnabledAsync(bool enabled) =>
+        await SetAsync(NotificationsEnabledKey, enabled.ToString());
+    public async Task<string> GetNotificationInstallationIdAsync()
+    {
+        await _installationIdLock.WaitAsync();
+        try
+        {
+            var connection = await database.GetConnectionAsync();
+            var existing = (await connection.FindAsync<AppSettingEntity>(NotificationInstallationIdKey))?.Value;
+            if (!string.IsNullOrWhiteSpace(existing)) return existing;
+            var created = Guid.NewGuid().ToString();
+            await SetAsync(NotificationInstallationIdKey, created);
+            return created;
+        }
+        finally { _installationIdLock.Release(); }
+    }
     private async Task SetAsync(string key, string value) => await (await database.GetConnectionAsync())
         .InsertOrReplaceAsync(new AppSettingEntity { Key = key, Value = value });
 }

@@ -41,6 +41,30 @@
                   Return="check"
                   Impersonate="yes" />
     <UI>
+      <Dialog Id="UpgradeInfoDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="25" Y="20" Width="320" Height="30"
+                 Transparent="yes" NoPrefix="yes" Text="Updating [ProductName]" />
+        <Control Id="Description" Type="Text" X="25" Y="62" Width="320" Height="52"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="Setup found an earlier version of [ProductName]. It will update the installed service and tray application to version [ProductVersion]." />
+        <Control Id="DataNotice" Type="Text" X="25" Y="126" Width="320" Height="55"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="Your existing configuration and monitoring history will be preserved. This update does not delete data stored in ProgramData." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel" />
+      </Dialog>
+      <Publish Dialog="WelcomeDlg"
+               Control="Next"
+               Event="NewDialog"
+               Value="UpgradeInfoDlg"
+               Condition="WIX_UPGRADE_DETECTED"
+               Order="2" />
+      <Publish Dialog="UpgradeInfoDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="UpgradeInfoDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+      <Publish Dialog="UpgradeInfoDlg" Control="Cancel" Event="SpawnDialog" Value="CancelDlg" />
       <Publish Dialog="ExitDialog"
                Control="Finish"
                Event="DoAction"

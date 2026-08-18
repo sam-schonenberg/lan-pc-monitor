@@ -1,6 +1,7 @@
 using System.Text.Json;
 namespace PCMonitor.Application.Models.Api;
-public sealed record ServiceStatusDto(string Status, string Service, string MachineName, DateTimeOffset Timestamp);
+public sealed record ServiceStatusDto(string Status, string Service, string MachineName, DateTimeOffset Timestamp,
+    string? Version = null, string? ApiVersion = null, IReadOnlyList<string>? Capabilities = null);
 public sealed record SensorReadingDto(string Id, string Hardware, string Name, string Type, float? Value, string? Unit);
 public sealed record SensorSnapshotDto(DateTimeOffset Timestamp, IReadOnlyList<SensorReadingDto> Sensors);
 public sealed record HistoricalSensorReadingDto(string Id, string Hardware, string Name, string Type, string? Unit, float Min, float Max, double Average, long SampleCount);
@@ -22,5 +23,15 @@ public sealed record HistoryManifestResponseDto(Guid StreamId, string CatalogVer
     DateTimeOffset GeneratedAt);
 public sealed record MonitorAlertDto(Guid Id, DateTimeOffset Timestamp, string Severity, string SensorId, string Hardware, string SensorName, string SensorType, double Value, double Threshold, string? Unit, string Message);
 public sealed record AlertHistoryResponseDto(DateTimeOffset? From, DateTimeOffset? To, IReadOnlyList<MonitorAlertDto> Alerts);
+public sealed record AlertMetricStatusDto(string Category, string Direction, string SensorId, string Hardware,
+    string SensorName, string SensorType, double Value, string? Unit, double WarningThreshold,
+    double CriticalThreshold, string State, double Progress, double DistanceToCritical,
+    double? PendingSecondsRemaining, string? Condition);
+public sealed record AlertStatusResponseDto(DateTimeOffset Timestamp, IReadOnlyList<AlertMetricStatusDto> Sensors);
+public sealed record DeviceRegistrationRequestDto(string InstallationId, string Token, string Platform, string? DeviceName);
+public sealed record DeviceRegistrationResponseDto(string InstallationId, string Platform, string? DeviceName,
+    DateTimeOffset UpdatedAt);
+public sealed record NotificationStatusDto(bool Enabled, bool Configured, int RegisteredDevices,
+    string MinimumSeverity);
 public sealed record SessionStatusDto(string State, JsonElement? Session);
 public sealed record LiveEventEnvelopeDto(string Type, JsonElement Data);

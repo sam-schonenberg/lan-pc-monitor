@@ -7,9 +7,12 @@
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
 </div>
 
-LAN PC Monitor combines a lightweight Windows monitoring service with a companion app. It turns hardware-specific sensor labels into readable names, keeps recent history locally, and offers live dashboards, charts, alerts, and load-session summaries.
+LAN PC Monitor combines a lightweight Windows monitoring service with a companion app. It turns hardware-specific sensor labels into readable names, keeps recent history locally, and offers live dashboards, charts, temperature and resource-pressure alerts, fan-health checks, and load-session summaries.
 
-Everything runs on your own network. There is no account, cloud backend, telemetry service, remote relay, or router configuration.
+See [push notification setup](docs/PUSH_NOTIFICATIONS.md) to enable critical sensor alerts on Android or iOS.
+
+Monitoring runs on your own network with no account, telemetry service, remote relay, or router configuration. Optional
+phone notifications use Firebase Cloud Messaging only to deliver critical alerts.
 
 > [!IMPORTANT]
 > The current API uses unencrypted HTTP and WebSockets without authentication. Install it only on a trusted local network. Never forward port `5005` or expose it to the internet.
@@ -98,7 +101,8 @@ The service listens on all local interfaces on port `5005` by default. Useful lo
 - Setup and pairing: <http://localhost:5005/setup>
 - Service status: <http://localhost:5005/status>
 - Current sensors: <http://localhost:5005/api/sensors>
-- Complete route reference: [API documentation](docs/API.md)
+- Public v1 contract and integration guide: [API documentation](docs/API.md)
+- Machine-readable OpenAPI 3.1 document: `http://<pc-address>:5005/openapi/v1.json`
 
 Use `http://`, not `https://`; TLS is not configured in this release.
 

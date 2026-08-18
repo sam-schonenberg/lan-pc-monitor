@@ -22,8 +22,10 @@ The MSI:
 - uses LAN PC Monitor branding throughout setup and in Windows Installed Apps;
 - opens the local pairing page in the default browser when setup finishes;
 - lets the user disable automatic Windows service startup from the setup completion page;
-- registers LAN PC Monitor in Windows Installed Apps/Add or Remove Programs; and
-- prevents an older MSI from replacing a newer installed version.
+- registers LAN PC Monitor in Windows Installed Apps/Add or Remove Programs;
+- prevents an older MSI from replacing a newer installed version;
+- detects an earlier installation and clearly identifies the operation as an update;
+- confirms during an update that existing configuration and monitoring history are preserved.
 
 Installation requires administrator approval because it writes to Program Files, registers a service, and changes Windows Firewall.
 
@@ -42,7 +44,7 @@ This conservative behavior prevents upgrades or accidental uninstallations from 
 From the repository root:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.1
+.\scripts\build-installer.ps1 -Version 0.1.2
 ```
 
 The script:
@@ -55,8 +57,8 @@ The script:
 Outputs:
 
 ```text
-artifacts\installer\LanPcMonitor-0.1.1-win-x64.msi
-artifacts\installer\LanPcMonitor-0.1.1-win-x64.msi.sha256
+artifacts\installer\LanPcMonitor-0.1.2-win-x64.msi
+artifacts\installer\LanPcMonitor-0.1.2-win-x64.msi.sha256
 ```
 
 MSI versions must use three numeric parts. Build each public version from a clean tagged commit.

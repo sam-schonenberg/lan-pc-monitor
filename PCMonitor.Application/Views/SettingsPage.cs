@@ -47,6 +47,13 @@ public sealed class SettingsPage : ContentPage
         synchronize.SetBinding(IsEnabledProperty, nameof(_viewModel.IsSynchronizing), converter: new InvertedBoolConverter());
         var loading = new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Start };
         loading.SetBinding(IsVisibleProperty, nameof(_viewModel.IsLoadingSensors));
+        var notificationStatus = new Label { FontSize = 12, Opacity = 0.75, LineBreakMode = LineBreakMode.WordWrap };
+        notificationStatus.SetBinding(Label.TextProperty, nameof(_viewModel.NotificationStatus));
+        var notificationButton = new Button();
+        notificationButton.SetBinding(Button.TextProperty, nameof(_viewModel.NotificationButtonText));
+        notificationButton.SetBinding(Button.CommandProperty, nameof(_viewModel.ToggleNotificationsCommand));
+        notificationButton.SetBinding(IsEnabledProperty, nameof(_viewModel.IsChangingNotifications),
+            converter: new InvertedBoolConverter());
         return new VerticalStackLayout
         {
             Padding = new Thickness(0, 18, 0, 12), Spacing = 12,
@@ -62,6 +69,13 @@ public sealed class SettingsPage : ContentPage
                     new Label { Text = "History synchronization", FontSize = 18, FontAttributes = FontAttributes.Bold },
                     lastSync, syncStatus, syncProgress, synchronize,
                     new Label { Text = "The latest history is also synchronized automatically whenever the app becomes active.",
+                        FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap }
+                }}),
+                Card(new VerticalStackLayout { Spacing = 9, Children =
+                {
+                    new Label { Text = "Critical notifications", FontSize = 18, FontAttributes = FontAttributes.Bold },
+                    notificationStatus, notificationButton,
+                    new Label { Text = "The app registers this phone with your PC. Sensor monitoring continues even when the app is closed.",
                         FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap }
                 }}),
                 new Label { Text = "Visible sensors", FontSize = 20, FontAttributes = FontAttributes.Bold,

@@ -25,3 +25,10 @@ public sealed record AlertHistoryResponse(
     IReadOnlyList<MonitorAlert> Alerts);
 
 public sealed record LiveEventEnvelope(string Type, object Data);
+
+public sealed record AlertMetricStatus(string Category, string Direction, string SensorId, string Hardware,
+    string SensorName, string SensorType, double Value, string? Unit, double WarningThreshold,
+    double CriticalThreshold, string State, double Progress, double DistanceToCritical,
+    double? PendingSecondsRemaining, string? Condition);
+
+public sealed record AlertStatusResponse(DateTimeOffset Timestamp, IReadOnlyList<AlertMetricStatus> Sensors);

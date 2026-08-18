@@ -13,6 +13,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _startItem;
     private readonly ToolStripMenuItem _stopItem;
     private readonly ToolStripMenuItem _restartItem;
+    private readonly ToolStripMenuItem _testNotificationItem;
     private readonly ToolStripMenuItem _serviceStartupItem;
     private readonly ServiceStatusReader _statusReader = new(ServiceName);
     private readonly MaintenanceScriptRunner _scriptRunner = new();
@@ -25,6 +26,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem = CreateAction("Start Service", "start-service.bat");
         _stopItem = CreateAction("Stop Service", "stop-service.bat");
         _restartItem = CreateAction("Restart Service", "restart-service.bat");
+        _testNotificationItem = new ToolStripMenuItem("Test GPU Overheating Notification");
+        _testNotificationItem.Click += async (_, _) => await SendTestNotificationAsync();
         _serviceStartupItem = new ToolStripMenuItem("Service / Auto Startup");
         _serviceStartupItem.Click += ToggleServiceStartup;
 
@@ -42,6 +45,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             new ToolStripMenuItem("Open Status Endpoint", null, (_, _) => OpenUrl("status")),
             new ToolStripMenuItem("Open Setup & Pairing", null, (_, _) => OpenUrl("setup")),
             new ToolStripSeparator(),
+            _testNotificationItem,
+            new ToolStripSeparator(),
+            new ToolStripMenuItem("About LAN PC Monitor", null, (_, _) => ShowAboutWindow()),
             new ToolStripMenuItem("Uninstall LAN PC Monitor…", null, UninstallApplication),
             new ToolStripSeparator(),
             new ToolStripMenuItem("Exit Tray App", null, (_, _) => ExitThread())
@@ -79,6 +85,36 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         RefreshStatus();
+    }
+
+    private async Task SendTestNotificationAsync()
+    {
+        _testNotificationItem.Enabled = false;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var port = TrayConfiguration.GetPort();
+            using var response = await client.PostAsync(
+                $"http://localhost:{port}/api/v1/notifications/test-overheating", null);
+            response.EnsureSuccessStatusCode();
+            _notifyIcon.ShowBalloonTip(3000, "LAN PC Monitor",
+                "GPU overheating test notification queued.", ToolTipIcon.Info);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"Could not send the test notification: {exception.Message}", "LAN PC Monitor",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            RefreshStatus();
+        }
+    }
+
+    private void ShowAboutWindow()
+    {
+        using var about = new AboutForm(_applicationIcon);
+        about.ShowDialog();
     }
 
     private void UninstallApplication(object? sender, EventArgs e)
@@ -208,6 +244,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem.Enabled = installed && state == ServiceState.Stopped;
         _stopItem.Enabled = installed && state is ServiceState.Running or ServiceState.StartPending;
         _restartItem.Enabled = installed && state == ServiceState.Running;
+        _testNotificationItem.Enabled = installed && state == ServiceState.Running;
         _serviceStartupItem.Text = state == ServiceState.Disabled
             ? "Enable Service / Auto Startup"
             : "Disable Service / Auto Startup";
@@ -219,6 +256,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _startItem.Enabled = enabled;
         _stopItem.Enabled = enabled;
         _restartItem.Enabled = enabled;
+        _testNotificationItem.Enabled = enabled;
         _serviceStartupItem.Enabled = enabled;
     }
 

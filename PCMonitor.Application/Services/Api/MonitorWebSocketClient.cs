@@ -14,7 +14,7 @@ public sealed class MonitorWebSocketClient(MonitorApiClient api, AlertRepository
     {
         await DisconnectAsync();
         var baseUri = await api.GetBaseUriAsync();
-        var uri = new UriBuilder(baseUri) { Scheme = "ws", Path = "/ws/sensors" }.Uri;
+        var uri = new UriBuilder(baseUri) { Scheme = "ws", Path = "/api/v1/ws/sensors" }.Uri;
         _socket = new ClientWebSocket();
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(token);
         await _socket.ConnectAsync(uri, token);

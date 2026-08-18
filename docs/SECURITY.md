@@ -9,10 +9,12 @@ LAN PC Monitor is intentionally self-hosted and LAN-only. Its design reduces exp
 The Windows monitoring service:
 
 - listens for inbound HTTP and WebSocket connections on the configured port (`5005` by default);
-- does not require an account, cloud backend, remote relay, analytics service, or telemetry endpoint;
-- does not initiate outbound internet connections as part of monitoring;
+- does not require an account, cloud backend, remote relay, analytics service, or telemetry endpoint for monitoring;
+- initiates outbound connections to Google OAuth and Firebase Cloud Messaging only when optional push
+  notifications are enabled;
 - does not configure a router, UPnP, NAT traversal, public DNS, or port forwarding; and
-- exposes read-only monitoring routes—there are no public API routes for executing commands or changing configuration.
+- exposes read-only monitoring routes plus device-token registration routes—there are no public API routes for
+  executing commands or changing configuration.
 
 Development operations such as restoring NuGet packages, downloading the .NET SDK, and opening documentation links can use the internet. Those are build/user actions, not monitoring-service runtime traffic.
 
@@ -52,6 +54,8 @@ Public IP literals, normal public DNS names, HTTPS URLs, and other URI schemes a
 - Retained process data contains a normalized process name and aggregate CPU statistics—not paths, arguments, environment variables, window titles, documents, memory contents, or network activity.
 - History and alert retention are bounded by configuration.
 - The service has no endpoint that uploads retained data elsewhere.
+- When push notifications are enabled, alert sensor names, values, thresholds, severity, and IDs are sent to
+  Firebase Cloud Messaging for delivery. The Firebase service-account private key stays on the monitored PC.
 
 ## Known security limitations
 
@@ -63,7 +67,9 @@ The current API uses `http://` and `ws://` with:
 - no request rate limiting; and
 - no origin-based WebSocket access control.
 
-Consequently, any device that can reach the API can read its monitoring data, a hostile LAN device may observe or alter unencrypted traffic, and the client cannot cryptographically prove that it reached the intended PC. The firewall rule is a network boundary, not an identity boundary.
+Consequently, any device that can reach the API can read its monitoring data or register/unregister notification
+destinations, a hostile LAN device may observe or alter unencrypted traffic, and the client cannot cryptographically
+prove that it reached the intended PC. The firewall rule is a network boundary, not an identity boundary.
 
 ## Safe deployment checklist
 
