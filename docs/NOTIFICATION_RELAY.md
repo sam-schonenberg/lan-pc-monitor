@@ -31,3 +31,7 @@ receives an FCM token or Firebase Admin credential.
 The public service is currently configured through `https://138-201-94-167.sslip.io/`. Operators of another deployment
 must use HTTPS, protect both relay secrets and Firebase credentials, restrict direct access to the application server,
 and review the privacy and abuse controls described in `notification-relay/README.md`.
+
+Users can review retention details and request deletion through the public data-deletion page:
+`https://138-201-94-167.sslip.io/delete-data`. The page can delete a registration using its installation ID and
+deletion capability; disabling notifications in the app performs the same authenticated deletion automatically.

@@ -87,5 +87,8 @@ delivery quotas at the reverse proxy or firewall.
 Registrations expire after 90 days by default. Expired or Firebase-rejected tokens are deleted. Disabling
 notifications in the app should call the deletion endpoint immediately.
 
+`GET /delete-data` serves the public, human-readable deletion instructions and a capability-authenticated deletion
+form suitable for linking from a store listing. Keep this page publicly reachable over HTTPS.
+
 This first schema is created automatically. Add an explicit migration tool before changing a deployed database
 schema; `create_all` is not a production migration strategy.

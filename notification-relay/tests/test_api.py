@@ -145,6 +145,16 @@ def test_health_does_not_require_authentication(tmp_path: Path) -> None:
         assert client.get("/health").json() == {"status": "ok"}
 
 
+def test_delete_data_page_is_public_and_not_cached(tmp_path: Path) -> None:
+    with TestClient(create_app(settings(tmp_path), FakeSender())) as client:
+        response = client.get("/delete-data")
+        assert response.status_code == 200
+        assert "Delete LAN PC Monitor notification data" in response.text
+        assert "Permanently delete notification data" in response.text
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["referrer-policy"] == "no-referrer"
+
+
 def test_notification_rejects_control_characters(tmp_path: Path) -> None:
     with TestClient(create_app(settings(tmp_path), FakeSender())) as client:
         created = register(client)
