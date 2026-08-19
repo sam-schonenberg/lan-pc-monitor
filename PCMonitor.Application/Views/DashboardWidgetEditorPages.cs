@@ -86,8 +86,12 @@ public sealed class DashboardWidgetEditorPage : ContentPage
 
     private async Task LoadOptionsAsync()
     {
-        var options = (await _history.GetSensorOptionsAsync()).Select(x => new WidgetSensorOption(x.SensorId,
-            SensorDisplayText.PickerLabel(x.SensorName, x.SensorType))).ToList();
+        var options = (await _history.GetSensorOptionsAsync())
+            .OrderByDescending(x => SensorDisplayText.CommonSensorPriority(x.Hardware, x.SensorName, x.SensorType, x.Unit))
+            .ThenBy(x => x.Hardware, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.SensorName, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new WidgetSensorOption(x.SensorId,
+                SensorDisplayText.PickerLabel(x.Hardware, x.SensorName, x.SensorType, x.Unit))).ToList();
         if (_definition.Type == DashboardWidgetType.Alerts) options.Insert(0, new WidgetSensorOption(null, "All sensors"));
         _sensors = options; _sensor.ItemsSource = options;
         var configuredSensor = _definition.Configuration switch

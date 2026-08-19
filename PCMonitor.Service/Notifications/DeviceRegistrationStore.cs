@@ -31,7 +31,7 @@ public sealed class DeviceRegistrationStore
 
     public DeviceRegistration Upsert(DeviceRegistrationRequest request)
     {
-        var registration = new DeviceRegistration(request.InstallationId.Trim(), request.Token.Trim(),
+        var registration = new DeviceRegistration(request.InstallationId.Trim(), request.SendSecret.Trim(),
             request.Platform, string.IsNullOrWhiteSpace(request.DeviceName) ? null : request.DeviceName.Trim(),
             _timeProvider.GetUtcNow());
         lock (_sync)
@@ -52,17 +52,6 @@ public sealed class DeviceRegistrationStore
         }
     }
 
-    public void RemoveByToken(string token)
-    {
-        lock (_sync)
-        {
-            var ids = _devices.Values.Where(x => x.Token == token).Select(x => x.InstallationId).ToArray();
-            if (ids.Length == 0) return;
-            foreach (var id in ids) _devices.Remove(id);
-            PersistLocked();
-        }
-    }
-
     private void Restore()
     {
         try
@@ -70,7 +59,7 @@ public sealed class DeviceRegistrationStore
             if (!File.Exists(_path)) return;
             var devices = JsonSerializer.Deserialize<DeviceRegistration[]>(File.ReadAllText(_path), JsonOptions) ?? [];
             foreach (var device in devices.Where(x => !string.IsNullOrWhiteSpace(x.InstallationId) &&
-                                                       !string.IsNullOrWhiteSpace(x.Token)))
+                                                       !string.IsNullOrWhiteSpace(x.SendSecret)))
                 _devices[device.InstallationId] = device;
         }
         catch (Exception exception)

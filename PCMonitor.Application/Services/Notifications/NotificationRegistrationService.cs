@@ -7,7 +7,9 @@ namespace PCMonitor.Application.Services.Notifications;
 public sealed class NotificationRegistrationService(
     IAppSettingsService settings,
     MonitorApiClient api,
-    IPushTokenProvider tokens)
+    IPushTokenProvider tokens,
+    NotificationRelayClient relay,
+    RelayInstallationStore relayStore)
 {
     private readonly SemaphoreSlim _sync = new(1, 1);
 
@@ -20,15 +22,18 @@ public sealed class NotificationRegistrationService(
         {
             if (!tokens.IsAvailable)
                 return new(false, "This build does not contain Firebase configuration.");
-            var status = await api.GetNotificationStatusAsync(cancellationToken);
-            if (!status.Enabled || !status.Configured)
-                return new(false, "Push notifications are not enabled on the PC service.");
             var token = await tokens.RequestPermissionAndGetTokenAsync(cancellationToken);
-            var installationId = await settings.GetNotificationInstallationIdAsync();
-            await api.RegisterNotificationDeviceAsync(new(installationId, token, PlatformName(),
+            var installation = await relayStore.GetAsync();
+            if (installation is null || !await relay.UpdateTokenAsync(installation, token, cancellationToken))
+            {
+                installation = await relay.CreateInstallationAsync(token, cancellationToken);
+                await relayStore.SaveAsync(installation);
+            }
+            await api.RegisterNotificationDeviceAsync(new(installation.InstallationId, installation.SendSecret,
+                PlatformName(),
                 DeviceInfo.Current.Name), cancellationToken);
             await settings.SetNotificationsEnabledAsync(true);
-            return new(true, $"Notifications enabled for {status.MinimumSeverity.ToLowerInvariant()} alerts.");
+            return new(true, "Critical alerts will be delivered through the notification relay.");
         }
         finally { _sync.Release(); }
     }
@@ -44,9 +49,25 @@ public sealed class NotificationRegistrationService(
         await _sync.WaitAsync(cancellationToken);
         try
         {
-            var installationId = await settings.GetNotificationInstallationIdAsync();
-            try { await api.UnregisterNotificationDeviceAsync(installationId, cancellationToken); }
-            finally { await settings.SetNotificationsEnabledAsync(false); }
+            var installation = await relayStore.GetAsync();
+            try
+            {
+                if (installation is not null)
+                    await api.UnregisterNotificationDeviceAsync(installation.InstallationId, cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    if (installation is not null)
+                        await relay.DeleteInstallationAsync(installation, cancellationToken);
+                }
+                finally
+                {
+                    relayStore.Clear();
+                    await settings.SetNotificationsEnabledAsync(false);
+                }
+            }
         }
         finally { _sync.Release(); }
     }

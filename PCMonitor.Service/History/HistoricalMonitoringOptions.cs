@@ -10,4 +10,7 @@ public sealed class HistoricalMonitoringOptions
     public string? HistoryFilePath { get; set; }
     public int DefaultPageSize { get; set; } = 500;
     public int MaximumPageSize { get; set; } = 2000;
+    public double MaintenanceIntervalHours { get; set; } = 24;
+    public double IdleDurationMinutes { get; set; } = 5;
+    public long MaximumFileSizeMegabytes { get; set; } = 128;
 }

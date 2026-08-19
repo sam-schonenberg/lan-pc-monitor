@@ -50,6 +50,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<MonitorApiClient>();
         builder.Services.AddSingleton<MonitorWebSocketClient>();
         builder.Services.AddSingleton<IPushTokenProvider, PushTokenProvider>();
+        builder.Services.AddSingleton<NotificationRelayClient>();
+        builder.Services.AddSingleton<RelayInstallationStore>();
         builder.Services.AddSingleton<NotificationRegistrationService>();
         builder.Services.AddSingleton<CurrentSensorStateService>();
 #if ANDROID
@@ -70,6 +72,7 @@ public static class MauiProgram
         builder.Services.AddTransient<DashboardPage>();
         builder.Services.AddTransient<HistoryPage>();
         builder.Services.AddTransient<AlertsPage>();
+        builder.Services.AddTransient<AlertRulesPage>();
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<AppShell>();
 #if DEBUG

@@ -4,6 +4,7 @@ public sealed class AlertOptions
 {
     public const string SectionName = "Alerts";
     public bool Enabled { get; set; } = true;
+    public string RuleStoreFile { get; set; } = string.Empty;
     public double EvaluationIntervalSeconds { get; set; } = 1;
     public TemperatureAlertOptions Temperature { get; set; } = new();
     public HighValueAlertOptions MemoryPressure { get; set; } = new()
@@ -26,6 +27,8 @@ public sealed class HighValueAlertOptions
 public sealed class FanAlertOptions
 {
     public bool Enabled { get; set; } = true;
+    public bool MonitorCpuFans { get; set; } = true;
+    public bool MonitorGpuFans { get; set; } = true;
     public double WarningBelowRpm { get; set; } = 300;
     public double CriticalBelowRpm { get; set; } = 100;
     public double ResetAboveRpm { get; set; } = 500;

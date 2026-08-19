@@ -24,10 +24,17 @@ public sealed class AppSettingsService(AppDatabase database) : IAppSettingsServi
     private const string LastHistorySyncKey = "History.LastSuccessfulSync";
     private const string NotificationsEnabledKey = "Notifications.Enabled";
     private const string NotificationInstallationIdKey = "Notifications.InstallationId";
+    internal const string DashboardDefaultsPendingKey = "Dashboard.DefaultsPending";
     private readonly SemaphoreSlim _installationIdLock = new(1, 1);
     private readonly SemaphoreSlim _hiddenSensorsLock = new(1, 1);
     public async Task<string?> GetApiBaseUrlAsync() => (await (await database.GetConnectionAsync()).FindAsync<AppSettingEntity>(ApiBaseUrlKey))?.Value;
-    public async Task SetApiBaseUrlAsync(string url) => await SetAsync(ApiBaseUrlKey, url);
+    public async Task SetApiBaseUrlAsync(string url)
+    {
+        var connection = await database.GetConnectionAsync();
+        var isFirstPairing = await connection.FindAsync<AppSettingEntity>(ApiBaseUrlKey) is null;
+        await SetAsync(ApiBaseUrlKey, url);
+        if (isFirstPairing) await SetAsync(DashboardDefaultsPendingKey, bool.TrueString);
+    }
     public async Task ClearApiBaseUrlAsync() => await (await database.GetConnectionAsync()).DeleteAsync<AppSettingEntity>(ApiBaseUrlKey);
     public async Task<string?> GetHistorySensorIdAsync() => (await (await database.GetConnectionAsync()).FindAsync<AppSettingEntity>(HistorySensorKey))?.Value;
     public async Task SetHistorySensorIdAsync(string sensorId) => await SetAsync(HistorySensorKey, sensorId);

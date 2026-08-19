@@ -76,3 +76,12 @@ $RECYCLE.BIN/
 # Firebase client configuration is environment-specific.
 PCMonitor.Application/Platforms/Android/google-services.json
 PCMonitor.Application/Platforms/iOS/GoogleService-Info.plist
+
+# Notification relay runtime state and credentials.
+notification-relay/*.db
+notification-relay/*.db-*
+notification-relay/data/
+notification-relay/secrets/
+notification-relay/.venv/
+**/__pycache__/
+*.py[cod]

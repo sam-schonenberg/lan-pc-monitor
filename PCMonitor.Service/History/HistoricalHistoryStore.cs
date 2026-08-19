@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Options;
 using PCMonitor.Service.Models;
+using PCMonitor.Service.SessionDetection;
 
 namespace PCMonitor.Service.History;
 
@@ -22,24 +23,34 @@ public sealed class HistoricalHistoryStore : BackgroundService
     private readonly int _defaultPageSize;
     private readonly int _maximumPageSize;
     private readonly TimeSpan _retention;
+    private readonly TimeSpan _maintenanceInterval;
+    private readonly TimeSpan _requiredIdleDuration;
+    private readonly long _maximumFileSizeBytes;
     private readonly string _historyPath;
     private readonly string _streamIdPath;
     private readonly Guid _streamId;
+    private readonly SessionRuntimeContext? _runtimeContext;
     private bool _persistenceAvailable;
     private DateTimeOffset _lastCompaction;
+    private DateTimeOffset? _idleSince;
     private long _nextSequence = 1;
     private int _nextSensorId = 1;
 
     public HistoricalHistoryStore(IOptions<HistoricalMonitoringOptions> options, TimeProvider timeProvider,
-        ILogger<HistoricalHistoryStore> logger)
+        ILogger<HistoricalHistoryStore> logger, SessionRuntimeContext? runtimeContext = null)
     {
-        _logger = logger; _timeProvider = timeProvider; _enabled = options.Value.Enabled;
+        _logger = logger; _timeProvider = timeProvider; _runtimeContext = runtimeContext; _enabled = options.Value.Enabled;
         _resolutionSeconds = options.Value.BucketDurationSeconds > 0 ? options.Value.BucketDurationSeconds : 60;
         _defaultPageSize = options.Value.DefaultPageSize > 0 ? options.Value.DefaultPageSize : 500;
         _maximumPageSize = options.Value.MaximumPageSize > 0 ? options.Value.MaximumPageSize : 2000;
         if (_defaultPageSize > _maximumPageSize) _defaultPageSize = _maximumPageSize;
         _retention = TimeSpan.FromHours(double.IsFinite(options.Value.RetentionHours) && options.Value.RetentionHours > 0
             ? options.Value.RetentionHours : 24);
+        _maintenanceInterval = TimeSpan.FromHours(double.IsFinite(options.Value.MaintenanceIntervalHours) &&
+            options.Value.MaintenanceIntervalHours > 0 ? options.Value.MaintenanceIntervalHours : 24);
+        _requiredIdleDuration = TimeSpan.FromMinutes(double.IsFinite(options.Value.IdleDurationMinutes) &&
+            options.Value.IdleDurationMinutes >= 0 ? options.Value.IdleDurationMinutes : 5);
+        _maximumFileSizeBytes = Math.Max(1, options.Value.MaximumFileSizeMegabytes) * 1024L * 1024L;
         _historyPath = string.IsNullOrWhiteSpace(options.Value.HistoryFilePath)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "LanPcMonitor", "history", "sensor-history.jsonl")
@@ -160,7 +171,7 @@ public sealed class HistoricalHistoryStore : BackgroundService
         await foreach (var snapshot in _writes.Reader.ReadAllAsync(stoppingToken))
         {
             await AppendAsync(snapshot);
-            if (_timeProvider.GetUtcNow() - _lastCompaction >= TimeSpan.FromHours(6)) await CompactAsync();
+            if (ShouldCompact()) await CompactAsync();
         }
     }
 
@@ -326,6 +337,24 @@ public sealed class HistoricalHistoryStore : BackgroundService
     private async Task AppendAsync(HistoricalSnapshot snapshot)
     { try { await File.AppendAllTextAsync(_historyPath, JsonSerializer.Serialize(snapshot, JsonOptions) + Environment.NewLine); }
       catch (Exception ex) { _logger.LogError(ex, "Unable to persist historical snapshot"); } }
+    private bool ShouldCompact()
+    {
+        var now = _timeProvider.GetUtcNow();
+        var idle = _runtimeContext?.GetSnapshot().State is null or LoadSessionState.Idle;
+        if (idle) _idleSince ??= now; else _idleSince = null;
+
+        var idleLongEnough = _idleSince is { } idleSince && now - idleSince >= _requiredIdleDuration;
+        var routineMaintenanceDue = now - _lastCompaction >= _maintenanceInterval && idleLongEnough;
+        var sizeMaintenanceDue = FileSizeAtLeast(_maximumFileSizeBytes) &&
+                                 now - _lastCompaction >= TimeSpan.FromHours(1);
+        return routineMaintenanceDue || sizeMaintenanceDue;
+    }
+    private bool FileSizeAtLeast(long threshold)
+    {
+        try { return new FileInfo(_historyPath).Length >= threshold; }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
     private async Task CompactAsync()
     {
         try
@@ -335,6 +364,8 @@ public sealed class HistoricalHistoryStore : BackgroundService
             await using (var writer = new StreamWriter(temp, false)) foreach (var item in retained)
                 await writer.WriteLineAsync(JsonSerializer.Serialize(item, JsonOptions));
             File.Move(temp, _historyPath, true); _lastCompaction = _timeProvider.GetUtcNow();
+            _logger.LogInformation("Historical maintenance completed: {RecordCount} records, {FileSizeBytes} bytes",
+                retained.Length, new FileInfo(_historyPath).Length);
         }
         catch (Exception ex) { _logger.LogError(ex, "Unable to compact historical history"); }
     }

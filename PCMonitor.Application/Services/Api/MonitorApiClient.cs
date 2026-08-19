@@ -40,6 +40,16 @@ public sealed class MonitorApiClient(IAppSettingsService settings)
         await GetAsync<AlertHistoryResponseDto>("api/v1/alerts" + QueryFrom(from), null, token);
     public async Task<AlertStatusResponseDto> GetAlertStatusAsync(CancellationToken token = default) =>
         await GetAsync<AlertStatusResponseDto>("api/v1/alerts/status", null, token);
+    public async Task<CustomAlertRulesResponseDto> GetAlertRulesAsync(CancellationToken token = default) =>
+        await GetAsync<CustomAlertRulesResponseDto>("api/v1/alert-rules", null, token);
+    public async Task<CustomAlertRuleDto> CreateAlertRuleAsync(CustomAlertRuleRequestDto rule,
+        CancellationToken token = default) =>
+        await SendAsync<CustomAlertRuleDto>(HttpMethod.Post, "api/v1/alert-rules", rule, token);
+    public async Task<CustomAlertRuleDto> UpdateAlertRuleAsync(Guid id, CustomAlertRuleRequestDto rule,
+        CancellationToken token = default) =>
+        await SendAsync<CustomAlertRuleDto>(HttpMethod.Put, $"api/v1/alert-rules/{id}", rule, token);
+    public async Task DeleteAlertRuleAsync(Guid id, CancellationToken token = default) =>
+        await SendAsync<object>(HttpMethod.Delete, $"api/v1/alert-rules/{id}", null, token, allowEmpty: true);
     public async Task<NotificationStatusDto> GetNotificationStatusAsync(CancellationToken token = default) =>
         await GetAsync<NotificationStatusDto>("api/v1/notifications/status", null, token);
     public async Task<DeviceRegistrationResponseDto> RegisterNotificationDeviceAsync(
@@ -91,8 +101,11 @@ public sealed class MonitorApiClient(IAppSettingsService settings)
             if (body is not null) request.Content = JsonContent.Create(body, options: JsonOptions);
             using var response = await _http.SendAsync(request, token);
             if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions, token);
                 throw new MonitorApiException(MonitorApiFailure.ApiError,
-                    $"Monitoring service returned HTTP {(int)response.StatusCode}.");
+                    error?.Error ?? $"Monitoring service returned HTTP {(int)response.StatusCode}.");
+            }
             if (allowEmpty) return default!;
             return await response.Content.ReadFromJsonAsync<T>(JsonOptions, token)
                    ?? throw new MonitorApiException(MonitorApiFailure.InvalidResponse,

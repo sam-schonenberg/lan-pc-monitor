@@ -27,7 +27,7 @@ Test the Android app on a physical device. Verify setup, reconnect, dashboard ed
 ## 3. Build and test the Windows installer
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.1
+.\scripts\build-installer.ps1 -Version 0.1.7
 ```
 
 Use Windows Sandbox or a disposable VM to verify fresh install, service startup, tray controls, the setup page, firewall scope, upgrade behavior, and uninstall behavior. Follow the detailed checklist in [Installer and updates](INSTALLER.md).
@@ -52,17 +52,17 @@ Upload the `.aab` to the intended Play testing or production track and complete 
 Only tag the exact commit that passed verification:
 
 ```powershell
-git tag -a v0.1.1 -m "LAN PC Monitor v0.1.1"
+git tag -a v0.1.7 -m "LAN PC Monitor v0.1.7"
 git push origin main
-git push origin v0.1.1
+git push origin v0.1.7
 ```
 
-On GitHub, choose **Releases → Draft a new release**, select `v0.1.1`, use `LAN PC Monitor v0.1.1` as the title, and paste the prepared release notes.
+On GitHub, choose **Releases → Draft a new release**, select `v0.1.7`, use `LAN PC Monitor v0.1.7` as the title, and paste the prepared release notes.
 
 Upload these assets:
 
-- `LanPcMonitor-0.1.1-win-x64.msi`
-- `LanPcMonitor-0.1.1-win-x64.msi.sha256`
+- `LanPcMonitor-0.1.7-win-x64.msi`
+- `LanPcMonitor-0.1.7-win-x64.msi.sha256`
 
 Do not upload the Play `.aab` to GitHub unless there is a deliberate reason to distribute the upload artifact publicly. Google Play is the distribution channel for the Android app.
 

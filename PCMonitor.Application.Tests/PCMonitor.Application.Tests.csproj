@@ -24,6 +24,7 @@
     <Compile Include="..\PCMonitor.Application\Models\DashboardWidgets.cs" Link="Application\DashboardWidgets.cs" />
     <Compile Include="..\PCMonitor.Application\Models\DashboardWidgetLayout.cs" Link="Application\DashboardWidgetLayout.cs" />
     <Compile Include="..\PCMonitor.Application\Services\Storage\HistoryRepository.cs" Link="Application\HistoryRepository.cs" />
+    <Compile Include="..\PCMonitor.Application\Services\Storage\AppSettingsService.cs" Link="Application\AppSettingsService.cs" />
     <Compile Include="..\PCMonitor.Application\Services\Storage\DashboardWidgetRepository.cs" Link="Application\DashboardWidgetRepository.cs" />
     <Compile Include="..\PCMonitor.Application\Services\Storage\AlertRepository.cs" Link="Application\AlertRepository.cs" />
   </ItemGroup>

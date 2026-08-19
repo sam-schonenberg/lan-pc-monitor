@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lan-pc-monitor-notification-relay"
+version = "0.1.0"
+description = "Privacy-focused push notification relay for LAN PC Monitor"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "cryptography>=45,<47",
+  "fastapi>=0.116,<1",
+  "firebase-admin>=7,<8",
+  "pydantic-settings>=2.10,<3",
+  "sqlalchemy>=2.0.41,<3",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx2>=2.11,<3",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]

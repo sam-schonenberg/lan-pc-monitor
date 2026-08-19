@@ -29,7 +29,7 @@ public static class ApiEndpointMappings
 
     private static ServiceStatus Status() => new("ok", "PCMonitor", Environment.MachineName,
         DateTimeOffset.UtcNow, typeof(ApiEndpointMappings).Assembly.GetName().Version?.ToString(3) ?? "0.0.0", "1",
-        ["sensors", "history", "sessions", "alerts", "push-notifications", "websocket"]);
+        ["sensors", "history", "sessions", "alerts", "custom-alert-rules", "push-notifications", "websocket"]);
 
     private static void MapApiGroup(RouteGroupBuilder group, bool documented)
     {
@@ -65,9 +65,25 @@ public static class ApiEndpointMappings
             "Get live alert metrics and thresholds",
             "Returns normalized progress, headroom, direction, and evaluator state for every exposed alert metric.")
             .Produces<AlertStatusResponse>();
+        Describe(group.MapGet("/alert-rules", (CustomAlertRuleStore rules) =>
+                new CustomAlertRulesResponse(rules.GetAll())), documented, "GetCustomAlertRules", "Alerts",
+            "Get custom alert rules", "Returns all persisted user-defined sensor alert rules.")
+            .Produces<CustomAlertRulesResponse>();
+        Describe(group.MapPost("/alert-rules", CreateAlertRule), documented, "CreateCustomAlertRule", "Alerts",
+            "Create a custom alert rule", "Creates and persists a threshold rule for one stable sensor ID.")
+            .Accepts<CustomAlertRuleRequest>("application/json").Produces<CustomAlertRule>(StatusCodes.Status201Created)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest);
+        Describe(group.MapPut("/alert-rules/{id:guid}", UpdateAlertRule), documented, "UpdateCustomAlertRule", "Alerts",
+            "Update a custom alert rule", "Replaces an existing custom rule while retaining its identity.")
+            .Accepts<CustomAlertRuleRequest>("application/json").Produces<CustomAlertRule>()
+            .Produces<ApiError>(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status404NotFound);
+        Describe(group.MapDelete("/alert-rules/{id:guid}", (Guid id, CustomAlertRuleStore rules) =>
+                rules.Remove(id) ? Results.NoContent() : Results.NotFound()), documented, "DeleteCustomAlertRule", "Alerts",
+            "Delete a custom alert rule", "Stops evaluating and permanently removes the rule.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
         Describe(group.MapGet("/notifications/status", NotificationStatus), documented, "GetNotificationStatus",
-            "Notifications", "Get push-notification status", "Does not expose device tokens or Firebase credentials.")
+            "Notifications", "Get push-notification status", "Does not expose relay capability secrets.")
             .Produces<Notifications.NotificationStatus>();
         Describe(group.MapPost("/notifications/test-overheating", TestOverheatingNotification), documented,
             "TestOverheatingNotification", "Notifications", "Send a simulated GPU overheating notification",
@@ -76,7 +92,7 @@ public static class ApiEndpointMappings
             .Produces(StatusCodes.Status202Accepted).Produces(StatusCodes.Status403Forbidden);
         Describe(group.MapPost("/notifications/devices", RegisterDevice), documented, "RegisterNotificationDevice",
             "Notifications", "Register or refresh a mobile installation",
-            "Idempotently replaces the token and metadata associated with the installation ID.")
+            "Idempotently replaces the relay send capability and metadata associated with the installation ID.")
             .Accepts<DeviceRegistrationRequest>("application/json").Produces<DeviceRegistrationResponse>()
             .Produces<ApiError>(StatusCodes.Status400BadRequest);
         Describe(group.MapDelete("/notifications/devices/{installationId}", (string installationId,
@@ -124,12 +140,40 @@ public static class ApiEndpointMappings
 
     private static IResult RegisterDevice(DeviceRegistrationRequest request, DeviceRegistrationStore devices)
     {
-        if (string.IsNullOrWhiteSpace(request.InstallationId) || request.InstallationId.Length > 128 ||
-            string.IsNullOrWhiteSpace(request.Token) || request.Token.Length > 4096 || request.DeviceName?.Length > 128)
-            return Results.BadRequest(new ApiError("A valid installationId and token are required."));
+        if (!Guid.TryParseExact(request.InstallationId, "D", out _) ||
+            string.IsNullOrWhiteSpace(request.SendSecret) || request.SendSecret.Length is < 32 or > 512 ||
+            request.DeviceName?.Length > 128)
+            return Results.BadRequest(new ApiError("A valid installationId and sendSecret are required."));
         var registration = devices.Upsert(request);
         return Results.Ok(new DeviceRegistrationResponse(registration.InstallationId, registration.Platform,
             registration.DeviceName, registration.UpdatedAt));
+    }
+
+    private static IResult CreateAlertRule(CustomAlertRuleRequest request, CustomAlertRuleStore rules,
+        SensorSnapshotStore snapshots)
+    {
+        var error = CustomAlertRuleStore.Validate(request);
+        var sensor = snapshots.Current.Sensors.FirstOrDefault(candidate =>
+            candidate.Id.Equals(request.SensorId, StringComparison.OrdinalIgnoreCase));
+        error ??= sensor is null ? "The selected sensor is not present in the current snapshot." :
+            rules.ValidateForSensor(request, sensor);
+        if (error is not null) return Results.BadRequest(new ApiError(error));
+        var created = rules.Create(request);
+        return Results.Created($"/api/v1/alert-rules/{created.Id}", created);
+    }
+
+    private static IResult UpdateAlertRule(Guid id, CustomAlertRuleRequest request, CustomAlertRuleStore rules,
+        SensorSnapshotStore snapshots)
+    {
+        if (rules.Get(id) is null) return Results.NotFound();
+        var error = CustomAlertRuleStore.Validate(request);
+        var sensor = snapshots.Current.Sensors.FirstOrDefault(candidate =>
+            candidate.Id.Equals(request.SensorId, StringComparison.OrdinalIgnoreCase));
+        error ??= sensor is null ? "The selected sensor is not present in the current snapshot." :
+            rules.ValidateForSensor(request, sensor, id);
+        if (error is not null) return Results.BadRequest(new ApiError(error));
+        var updated = rules.Update(id, request);
+        return updated is null ? Results.NotFound() : Results.Ok(updated);
     }
 
     private static IResult History(DateTimeOffset? from, DateTimeOffset? to, long? afterSequence,

@@ -29,6 +29,13 @@ builder.Services.Configure<HistoricalMonitoringOptions>(builder.Configuration.Ge
 builder.Services.Configure<ProcessMonitoringOptions>(builder.Configuration.GetSection(ProcessMonitoringOptions.SectionName));
 builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
+builder.Services.PostConfigure<NotificationOptions>(options =>
+{
+    // v0.1.2 and earlier preserved a direct-Firebase configuration without RelayBaseUrl.
+    if (!string.IsNullOrWhiteSpace(options.RelayBaseUrl)) return;
+    options.RelayBaseUrl = NotificationOptions.DefaultRelayBaseUrl;
+    options.Enabled = true;
+});
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
@@ -63,9 +70,10 @@ builder.Services.AddSingleton<HistoricalHistoryStore>();
 builder.Services.AddSingleton<HistoricalSensorAggregator>();
 builder.Services.AddSingleton<LiveEventHub>();
 builder.Services.AddSingleton<AlertStore>();
+builder.Services.AddSingleton<CustomAlertRuleStore>();
 builder.Services.AddSingleton<AlertEvaluator>();
 builder.Services.AddSingleton<DeviceRegistrationStore>();
-builder.Services.AddHttpClient<IPushNotificationProvider, FcmPushNotificationProvider>();
+builder.Services.AddHttpClient<IPushNotificationProvider, NotificationRelayPushProvider>();
 builder.Services.AddSingleton<NotificationDispatcher>();
 builder.Services.AddSingleton<INotificationDispatcher>(serviceProvider =>
     serviceProvider.GetRequiredService<NotificationDispatcher>());

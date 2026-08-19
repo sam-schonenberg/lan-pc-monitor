@@ -10,13 +10,13 @@ public enum MobilePlatform
 
 public sealed record DeviceRegistrationRequest(
     string InstallationId,
-    string Token,
+    string SendSecret,
     MobilePlatform Platform,
     string? DeviceName);
 
 public sealed record DeviceRegistration(
     string InstallationId,
-    string Token,
+    string SendSecret,
     MobilePlatform Platform,
     string? DeviceName,
     DateTimeOffset UpdatedAt);
@@ -36,5 +36,5 @@ public sealed record NotificationStatus(
 public enum PushDeliveryResult
 {
     Delivered,
-    InvalidToken
+    InvalidDestination
 }

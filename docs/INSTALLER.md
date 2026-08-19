@@ -10,12 +10,17 @@ The MSI:
 
 - installs under `%ProgramFiles%\LAN PC Monitor` by default;
 - registers `PCMonitor` as an automatically started Windows service;
+- installs the official signed PawnIO driver dependency before starting the service, enabling supported CPU and motherboard temperatures, fan speeds, voltages, and other low-level sensors;
 - stops the service safely during upgrades and uninstallation;
 - configures three restart-on-failure attempts with a five-second delay;
 - creates the `LAN PC Monitor - API` inbound firewall rule for TCP port `5005`;
 - restricts that rule to the local subnet while allowing all Windows network profiles, including Public;
 - adds a Start Menu shortcut for the optional tray companion;
-- starts the tray companion automatically whenever a user signs in;
+- starts the tray companion automatically whenever any user signs in, using the machine-wide Windows Run entry;
+- asks every running tray companion to exit during installation and upgrades, waits up to fifteen seconds, then
+  terminates any remaining instance so locked files do not block setup;
+- immediately before an update starts, checks for tray processes once per second, force-closes every instance it
+  finds, and refuses to replace files if an instance remains after fifteen seconds;
 - prevents duplicate tray companion instances within the same Windows session;
 - provides one context-sensitive tray command to enable or disable the service and its automatic startup;
 - launches the MSI-managed Windows uninstall flow from the tray companion;
@@ -24,16 +29,25 @@ The MSI:
 - lets the user disable automatic Windows service startup from the setup completion page;
 - registers LAN PC Monitor in Windows Installed Apps/Add or Remove Programs;
 - prevents an older MSI from replacing a newer installed version;
-- detects an earlier installation and clearly identifies the operation as an update;
+- detects an earlier installation and presents a dedicated updater confirmation with an **Update** action;
+- retains the existing installation directory and skips fresh-install choices during an update;
+- starts the updated tray companion in the signed-in user's session after a successful update;
 - confirms during an update that existing configuration and monitoring history are preserved.
 
 Installation requires administrator approval because it writes to Program Files, registers a service, and changes Windows Firewall.
+
+PawnIO is redistributed unmodified under its own GPL-2.0-or-later license. Its setup program, license, checksum, and source links are installed under `ThirdParty\PawnIO`. PawnIO is a shared system driver and remains installed when LAN PC Monitor is removed so uninstalling this application does not break other hardware-monitoring software.
 
 The installer does not enable router forwarding, UPnP, public-network access, an update service, or any outbound network rule.
 
 ## Preserved data
 
 `appsettings.json` is marked permanent and never-overwrite so local configuration survives repair, upgrade, and uninstall. Runtime history lives separately under `%ProgramData%\LanPcMonitor` and is not owned or removed by the MSI.
+
+History cleanup preserves the configured retention period and minute-level readings. Routine cleanup runs at most once
+per day after load-session detection has reported an idle PC continuously for five minutes. If the history file reaches
+128 MB, cleanup may run sooner, with at least one hour between size-triggered passes. Cleanup removes expired and
+duplicate records through a temporary file and replaces the live file only after the rewrite succeeds.
 
 Installed files are grouped under `Service` and `Tray` subdirectories so each self-contained application keeps its own runtime dependencies. The shared `appsettings.json` remains at the installation root for compatibility with existing installations.
 
@@ -44,7 +58,7 @@ This conservative behavior prevents upgrades or accidental uninstallations from 
 From the repository root:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.2
+.\scripts\build-installer.ps1 -Version 0.1.7
 ```
 
 The script:
@@ -57,8 +71,8 @@ The script:
 Outputs:
 
 ```text
-artifacts\installer\LanPcMonitor-0.1.2-win-x64.msi
-artifacts\installer\LanPcMonitor-0.1.2-win-x64.msi.sha256
+artifacts\installer\LanPcMonitor-0.1.7-win-x64.msi
+artifacts\installer\LanPcMonitor-0.1.7-win-x64.msi.sha256
 ```
 
 MSI versions must use three numeric parts. Build each public version from a clean tagged commit.
@@ -68,15 +82,19 @@ MSI versions must use three numeric parts. Build each public version from a clea
 Installer behavior should be tested in Windows Sandbox or a disposable Windows VM before every release:
 
 1. Install version N and confirm UAC identifies the expected publisher.
-2. Confirm the `PCMonitor` service is automatic and running.
-3. Confirm `/status` responds locally.
-4. Confirm the firewall rule is All profiles + LocalSubnet + TCP 5005.
-5. Launch the tray shortcut and exercise service controls.
-6. Modify `appsettings.json` and create history.
-7. Install version N+1 and verify configuration/history survive.
-8. Attempt to install N again and verify downgrade blocking.
-9. Uninstall N+1 and confirm the service, firewall rule, binaries, and shortcut are removed.
-10. Confirm configuration and `%ProgramData%` history remain.
+2. Confirm PawnIO is installed and running before the `PCMonitor` service starts.
+3. Confirm the `PCMonitor` service is automatic and running.
+4. Confirm `/status` responds locally and `/api/v1/sensors` contains supported CPU temperatures and motherboard sensors.
+5. Confirm the firewall rule is All profiles + LocalSubnet + TCP 5005.
+6. Launch the tray shortcut and exercise service controls.
+7. Modify `appsettings.json` and create history.
+8. Install version N+1 and verify configuration/history survive.
+9. Leave the tray running while updating and confirm the updater identifies itself as an update, offers an **Update**
+   action, closes the tray, stops the service, and does not show the installation-directory or initial-setup choices.
+10. Confirm the completion page says the update succeeded and both the service and tray use version N+1.
+11. Attempt to install N again and verify downgrade blocking.
+12. Uninstall N+1 and confirm the service, firewall rule, binaries, and shortcut are removed.
+13. Confirm configuration, `%ProgramData%` history, and the shared PawnIO driver remain.
 
 Do not test installation on a production PC until the package is signed and the behavior has passed a disposable-machine test.
 

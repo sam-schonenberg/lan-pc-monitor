@@ -1,5 +1,7 @@
 using System.Text.Json;
 namespace PCMonitor.Application.Models.Api;
+
+public sealed record ApiErrorDto(string Error);
 public sealed record ServiceStatusDto(string Status, string Service, string MachineName, DateTimeOffset Timestamp,
     string? Version = null, string? ApiVersion = null, IReadOnlyList<string>? Capabilities = null);
 public sealed record SensorReadingDto(string Id, string Hardware, string Name, string Type, float? Value, string? Unit);
@@ -28,7 +30,15 @@ public sealed record AlertMetricStatusDto(string Category, string Direction, str
     double CriticalThreshold, string State, double Progress, double DistanceToCritical,
     double? PendingSecondsRemaining, string? Condition);
 public sealed record AlertStatusResponseDto(DateTimeOffset Timestamp, IReadOnlyList<AlertMetricStatusDto> Sensors);
-public sealed record DeviceRegistrationRequestDto(string InstallationId, string Token, string Platform, string? DeviceName);
+public sealed record CustomAlertRuleDto(Guid Id, string Name, string SensorId, string Direction,
+    double Threshold, double ResetThreshold, double MinimumDurationSeconds, string Severity,
+    bool Enabled, bool NotificationsEnabled);
+public sealed record CustomAlertRuleRequestDto(string Name, string SensorId, string Direction,
+    double Threshold, double ResetThreshold, double MinimumDurationSeconds, string Severity,
+    bool Enabled, bool NotificationsEnabled);
+public sealed record CustomAlertRulesResponseDto(IReadOnlyList<CustomAlertRuleDto> Rules);
+public sealed record DeviceRegistrationRequestDto(string InstallationId, string SendSecret, string Platform,
+    string? DeviceName);
 public sealed record DeviceRegistrationResponseDto(string InstallationId, string Platform, string? DeviceName,
     DateTimeOffset UpdatedAt);
 public sealed record NotificationStatusDto(bool Enabled, bool Configured, int RegisteredDevices,

@@ -91,7 +91,9 @@ public partial class DashboardViewModel : ObservableObject
 
     public async Task ReloadWidgetsAsync()
     {
-        var sensors = (await _history.GetSensorOptionsAsync()).ToDictionary(x => x.SensorId, StringComparer.Ordinal);
+        var sensorOptions = await _history.GetSensorOptionsAsync();
+        await _widgets.InitializeDefaultsIfPendingAsync(sensorOptions);
+        var sensors = sensorOptions.ToDictionary(x => x.SensorId, StringComparer.Ordinal);
         var definitions = await _widgets.GetAllAsync();
         Widgets.Clear();
         foreach (var definition in definitions)

@@ -1,6 +1,6 @@
 <Project Sdk="WixToolset.Sdk/6.0.1">
   <PropertyGroup>
-    <InstallerVersion Condition="'$(InstallerVersion)' == ''">0.1.2</InstallerVersion>
+    <InstallerVersion Condition="'$(InstallerVersion)' == ''">0.1.7</InstallerVersion>
     <InstallerPayloadPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\artifacts\publish\win-x64'))</InstallerPayloadPath>
     <ServicePayloadPath>$(InstallerPayloadPath)\Service</ServicePayloadPath>
     <TrayPayloadPath>$(InstallerPayloadPath)\Tray</TrayPayloadPath>

@@ -280,7 +280,11 @@ public partial class HistoryViewModel(
         var hidden = await settings.GetHiddenSensorIdsAsync();
         var options = (await repository.GetSensorOptionsAsync())
             .Where(x => !hidden.Contains(x.SensorId))
-            .Select(x => new HistorySensorOption(x.SensorId, x.Hardware, x.SensorName, x.SensorType, x.Unit)).ToArray();
+            .Select(x => new HistorySensorOption(x.SensorId, x.Hardware, x.SensorName, x.SensorType, x.Unit))
+            .OrderByDescending(x => x.CommonPriority)
+            .ThenBy(x => x.Hardware, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         _updatingSensorOptions = true;
         try
         {
@@ -336,7 +340,8 @@ public sealed record HistorySensorOption(string Id, string Hardware, string Name
 {
     // Native pickers have a single compact row. The selected sensor's hardware and type
     // are shown below the picker instead of making every option unreadably long.
-    public string DisplayName => SensorDisplayText.PickerLabel(Name, Type);
+    public int CommonPriority => SensorDisplayText.CommonSensorPriority(Hardware, Name, Type, Unit);
+    public string DisplayName => SensorDisplayText.PickerLabel(Hardware, Name, Type, Unit);
     public string Details => $"{SensorDisplayText.FriendlyType(Type)} · {Hardware}";
     public bool IsTemperature => Type.Contains("temperature", StringComparison.OrdinalIgnoreCase);
     public bool IsGpuTemperature => IsTemperature && Hardware.Contains("gpu", StringComparison.OrdinalIgnoreCase) ||

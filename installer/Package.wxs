@@ -12,6 +12,16 @@
            Language="1033">
 
     <SummaryInformation Description="LAN-only Windows hardware monitoring service and tray companion." />
+    <util:CloseApplication Id="CloseTrayApplication"
+                           Target="LanPcMonitor.Tray.exe"
+                           Description="LAN PC Monitor tray companion must close before setup can continue."
+                           CloseMessage="yes"
+                           ElevatedCloseMessage="yes"
+                           ElevatedEndSessionMessage="yes"
+                           Timeout="15"
+                           PromptToContinue="yes"
+                           RebootPrompt="no"
+                           TerminateProcess="0" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of LAN PC Monitor is already installed."
                   Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -29,6 +39,16 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
               Value="Start the monitoring service automatically with Windows" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <SetProperty Id="WixQuietExecCmdLine"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -Command &quot;$d=(date).AddSeconds(15);do{$p=ps LanPcMonitor.Tray -ea 0;if(!$p){exit 0};$p|kill -Force -ea 0;sleep 1}while((date)-lt$d);exit 1&quot;"
+                 After="CostFinalize"
+                 Sequence="ui"
+                 Condition="WIX_UPGRADE_DETECTED" />
+    <SetProperty Id="WIXUI_EXITDIALOGOPTIONALTEXT"
+                 Value="LAN PC Monitor [ProductVersion] was updated successfully. The service and tray companion now use the new version."
+                 After="FindRelatedProducts"
+                 Sequence="ui"
+                 Condition="WIX_UPGRADE_DETECTED" />
     <Property Id="WixShellExecTarget" Value="http://localhost:5005/setup" />
     <CustomAction Id="OpenPairingPage"
                   BinaryRef="Wix4UtilCA_X64"
@@ -40,19 +60,56 @@
                   Execute="immediate"
                   Return="check"
                   Impersonate="yes" />
+    <CustomAction Id="TerminateTrayProcesses"
+                  BinaryRef="Wix4UtilCA_X64"
+                  DllEntry="WixQuietExec"
+                  Execute="immediate"
+                  Return="check" />
+    <CustomAction Id="LaunchTrayAfterUpdate"
+                  FileRef="TrayExecutable"
+                  ExeCommand="--updated"
+                  Execute="immediate"
+                  Return="asyncNoWait"
+                  Impersonate="yes" />
+    <CustomAction Id="InstallPawnIO"
+                  FileRef="PawnIOSetupExecutable"
+                  ExeCommand="-install -silent"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+    <InstallExecuteSequence>
+      <Custom Action="InstallPawnIO"
+              Before="StartServices"
+              Condition="NOT REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
     <UI>
       <Dialog Id="UpgradeInfoDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Title" Type="Text" X="25" Y="20" Width="320" Height="30"
-                 Transparent="yes" NoPrefix="yes" Text="Updating [ProductName]" />
+                 Transparent="yes" NoPrefix="yes" Text="Update [ProductName]" />
         <Control Id="Description" Type="Text" X="25" Y="62" Width="320" Height="52"
                  Transparent="yes" NoPrefix="yes"
-                 Text="Setup found an earlier version of [ProductName]. It will update the installed service and tray application to version [ProductVersion]." />
+                 Text="The [ProductName] updater found an earlier version. It will close the running app and update the service and tray companion to version [ProductVersion]." />
         <Control Id="DataNotice" Type="Text" X="25" Y="126" Width="320" Height="55"
                  Transparent="yes" NoPrefix="yes"
-                 Text="Your existing configuration and monitoring history will be preserved. This update does not delete data stored in ProgramData." />
+                 Text="Your configuration and monitoring history will be preserved. The app may be force-closed if it does not exit within 15 seconds." />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
-                 Default="yes" Text="&amp;Next" />
+                 Default="yes" Text="&amp;Continue" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel" />
+      </Dialog>
+      <Dialog Id="UpdateReadyDlg" Width="370" Height="270" Title="[ProductName] Updater">
+        <Control Id="Title" Type="Text" X="25" Y="20" Width="320" Height="30"
+                 Transparent="yes" NoPrefix="yes" Text="Ready to update [ProductName]" />
+        <Control Id="Description" Type="Text" X="25" Y="62" Width="320" Height="48"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="Click Update to close LAN PC Monitor completely and install version [ProductVersion]." />
+        <Control Id="ShutdownNotice" Type="Text" X="25" Y="122" Width="320" Height="55"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="The tray companion will exit and the monitoring service will stop before any application files are replaced. Both will use the new version after the update finishes." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Update" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Update" />
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
                  Cancel="yes" Text="Cancel" />
       </Dialog>
@@ -63,32 +120,46 @@
                Condition="WIX_UPGRADE_DETECTED"
                Order="2" />
       <Publish Dialog="UpgradeInfoDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-      <Publish Dialog="UpgradeInfoDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+      <Publish Dialog="UpgradeInfoDlg" Control="Next" Event="NewDialog" Value="UpdateReadyDlg" />
       <Publish Dialog="UpgradeInfoDlg" Control="Cancel" Event="SpawnDialog" Value="CancelDlg" />
+      <Publish Dialog="UpdateReadyDlg" Control="Back" Event="NewDialog" Value="UpgradeInfoDlg" />
+      <Publish Dialog="UpdateReadyDlg" Control="Update" Event="DoAction"
+               Value="TerminateTrayProcesses" Order="1" />
+      <Publish Dialog="UpdateReadyDlg" Control="Update" Event="EndDialog"
+               Value="Return" Order="2" />
+      <Publish Dialog="UpdateReadyDlg" Control="Cancel" Event="SpawnDialog" Value="CancelDlg" />
       <Publish Dialog="ExitDialog"
                Control="Finish"
                Event="DoAction"
                Value="DisableServiceAutoStartup"
-               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX &lt;&gt; 1 AND NOT Installed"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX &lt;&gt; 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"
                Order="1" />
       <Publish Dialog="ExitDialog"
                Control="Finish"
                Event="DoAction"
                Value="OpenPairingPage"
-               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"
                Order="2" />
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="LaunchTrayAfterUpdate"
+               Condition="WIX_UPGRADE_DETECTED"
+               Order="3" />
     </UI>
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="LAN PC Monitor">
         <Directory Id="SERVICEDIRECTORY" Name="Service" />
         <Directory Id="TRAYDIRECTORY" Name="Tray" />
+        <Directory Id="THIRDPARTYDIRECTORY" Name="ThirdParty">
+          <Directory Id="PAWNIODIRECTORY" Name="PawnIO" />
+        </Directory>
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="LAN PC Monitor" />
     </StandardDirectory>
-    <StandardDirectory Id="StartupFolder" />
 
     <Feature Id="MainFeature" Title="LAN PC Monitor" Level="1">
       <ComponentRef Id="ServiceComponent" />
@@ -96,6 +167,7 @@
       <ComponentRef Id="ConfigurationComponent" />
       <ComponentRef Id="FirewallComponent" />
       <ComponentRef Id="ProgramMenuFolderComponent" />
+      <ComponentRef Id="PawnIOComponent" />
       <Files Include="$(ServicePublishDir)\**"
              Directory="SERVICEDIRECTORY">
         <Exclude Files="$(ServicePublishDir)\PCMonitor.Service.exe" />
@@ -108,6 +180,19 @@
         <Exclude Files="$(TrayPublishDir)\**\*.pdb" />
       </Files>
     </Feature>
+
+    <Component Id="PawnIOComponent"
+               Directory="PAWNIODIRECTORY"
+               Guid="4FEC0600-1B79-478C-96BD-BB4C68ACFB87"
+               Permanent="yes">
+      <File Id="PawnIOSetupExecutable"
+            Source="$(sys.SOURCEFILEDIR)ThirdParty\PawnIO\PawnIO_setup.exe"
+            KeyPath="yes" />
+      <File Id="PawnIOLicense"
+            Source="$(sys.SOURCEFILEDIR)ThirdParty\PawnIO\COPYING.txt" />
+      <File Id="PawnIOReadme"
+            Source="$(sys.SOURCEFILEDIR)ThirdParty\PawnIO\README.txt" />
+    </Component>
 
     <Component Id="ServiceComponent" Directory="SERVICEDIRECTORY" Guid="A623F716-D44F-4F9A-BF1F-0F26BECE400F">
       <File Id="ServiceExecutable" Source="$(ServicePublishDir)\PCMonitor.Service.exe" KeyPath="yes" />
@@ -142,15 +227,12 @@
                   Icon="LanPcMonitorShortcut.exe"
                   IconIndex="0"
                   Advertise="yes" />
-        <Shortcut Id="TrayStartupShortcut"
-                  Directory="StartupFolder"
-                  Name="LAN PC Monitor"
-                  Description="Start the LAN PC Monitor tray companion when a user signs in."
-                  WorkingDirectory="TRAYDIRECTORY"
-                  Icon="LanPcMonitorShortcut.exe"
-                  IconIndex="0"
-                  Advertise="yes" />
       </File>
+      <RegistryValue Root="HKLM"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                     Name="LAN PC Monitor"
+                     Type="string"
+                     Value="&quot;[#TrayExecutable]&quot;" />
     </Component>
 
     <Component Id="ConfigurationComponent"

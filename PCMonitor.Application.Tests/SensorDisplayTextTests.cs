@@ -26,4 +26,23 @@ public sealed class SensorDisplayTextTests
     {
         Assert.Equal(name, SensorDisplayText.PickerLabel(name, type));
     }
+
+    [Theory]
+    [InlineData("Intel Core i7", "CPU Package Temperature", "Temperature", "°C", 1000)]
+    [InlineData("NVIDIA GeForce", "GPU Core Temperature", "Temperature", "°C", 990)]
+    [InlineData("Total Memory", "System Memory Usage", "Load", "%", 880)]
+    [InlineData("Virtual Memory", "System Memory Usage", "Load", "%", 0)]
+    [InlineData("Intel Core i7", "CPU Core 1 Temperature", "Temperature", "°C", 0)]
+    public void RanksOnlyCommonlyRequestedSensors(string hardware, string name, string type, string unit,
+        int expected)
+    {
+        Assert.Equal(expected, SensorDisplayText.CommonSensorPriority(hardware, name, type, unit));
+    }
+
+    [Fact]
+    public void MarksCommonPickerEntriesWithAStar()
+    {
+        Assert.Equal("★ CPU Package Temperature",
+            SensorDisplayText.PickerLabel("Intel Core i7", "CPU Package Temperature", "Temperature", "°C"));
+    }
 }

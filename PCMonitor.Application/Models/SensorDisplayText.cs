@@ -2,6 +2,12 @@ namespace PCMonitor.Application.Models;
 
 public static class SensorDisplayText
 {
+    public static string PickerLabel(string hardware, string name, string type, string? unit)
+    {
+        var label = PickerLabel(name, type);
+        return CommonSensorPriority(hardware, name, type, unit) > 0 ? $"★ {label}" : label;
+    }
+
     public static string PickerLabel(string name, string type)
     {
         var label = FriendlyType(type);
@@ -32,6 +38,31 @@ public static class SensorDisplayText
         "Humidity" => "Humidity",
         _ => type
     };
+
+    public static int CommonSensorPriority(string hardware, string name, string type, string? unit)
+    {
+        var temperature = type.Equals("Temperature", StringComparison.OrdinalIgnoreCase);
+        var usage = type.Equals("Load", StringComparison.OrdinalIgnoreCase) && unit == "%";
+        var fan = type.Equals("Fan", StringComparison.OrdinalIgnoreCase);
+        var cpu = ContainsAny(hardware, "cpu", "intel", "amd", "ryzen") || Contains(name, "cpu");
+        var gpu = ContainsAny(hardware, "gpu", "nvidia", "radeon", "graphics") || Contains(name, "gpu");
+
+        if (temperature && cpu && Contains(name, "package")) return 1000;
+        if (temperature && gpu && Contains(name, "core")) return 990;
+        if (temperature && cpu && Contains(name, "average")) return 980;
+        if (temperature && cpu && Contains(name, "core max")) return 970;
+        if (usage && cpu && ContainsAny(name, "overall cpu", "cpu total", "total cpu")) return 900;
+        if (usage && gpu && Contains(name, "core")) return 890;
+        if (usage && ContainsAny(name, "memory usage", "ram usage", "memory load"))
+            return Contains(hardware, "total memory") ? 880 : Contains(hardware, "virtual") ? 0 : 870;
+        if (fan && cpu && Contains(name, "cpu fan")) return 800;
+        if (fan && gpu && Contains(name, "gpu fan")) return 790;
+        return 0;
+    }
+
+    private static bool Contains(string value, string term) =>
+        value.Contains(term, StringComparison.OrdinalIgnoreCase);
+    private static bool ContainsAny(string value, params string[] terms) => terms.Any(term => Contains(value, term));
 
     private static bool DescribesMeasurement(string name, string type)
     {

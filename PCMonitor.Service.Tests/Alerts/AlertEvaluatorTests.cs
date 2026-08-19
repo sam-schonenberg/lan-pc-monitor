@@ -7,9 +7,10 @@ using Xunit;
 
 namespace PCMonitor.Service.Tests.Alerts;
 
-public sealed class AlertEvaluatorTests
+public sealed class AlertEvaluatorTests : IDisposable
 {
     private readonly DateTimeOffset _start = new(2026, 8, 14, 12, 0, 0, TimeSpan.Zero);
+    private readonly string _rulesPath = Path.Combine(Path.GetTempPath(), $"pcmonitor-rules-{Guid.NewGuid():N}.json");
 
     [Fact]
     public void TransientSpikeDoesNotRaiseAlert()
@@ -75,6 +76,37 @@ public sealed class AlertEvaluatorTests
     }
 
     [Fact]
+    public void UnusedSystemFanHeadersNeverRaiseAlerts()
+    {
+        var evaluator = Create(out var store);
+        var fan = new SensorReading("system-fan-1", "Nuvoton", "System Fan #1", "Fan", 0, "RPM");
+        evaluator.Process(Snapshot(_start, 75, fan));
+        evaluator.Process(Snapshot(_start.AddSeconds(30), 75, fan));
+        Assert.Empty(store.Query(null, null).Alerts);
+        Assert.DoesNotContain(evaluator.GetStatus(Snapshot(_start.AddSeconds(31), 75, fan)).Sensors,
+            sensor => sensor.Category == "fan");
+    }
+
+    [Fact]
+    public void FanFailureNotifiesOnceUntilRpmActuallyRecovers()
+    {
+        var evaluator = Create(out var store);
+        var stopped = new SensorReading("fan", "Nuvoton", "CPU Fan", "Fan", 0, "RPM");
+        evaluator.Process(Snapshot(_start, 75, stopped));
+        evaluator.Process(Snapshot(_start.AddSeconds(15), 75, stopped));
+        evaluator.Process(Snapshot(_start.AddSeconds(30), 60, stopped));
+        evaluator.Process(Snapshot(_start.AddSeconds(45), 75, stopped));
+        evaluator.Process(Snapshot(_start.AddSeconds(60), 75, stopped));
+        Assert.Single(store.Query(null, null).Alerts);
+
+        var recovered = stopped with { Value = 800 };
+        evaluator.Process(Snapshot(_start.AddSeconds(61), 75, recovered));
+        evaluator.Process(Snapshot(_start.AddSeconds(62), 75, stopped));
+        evaluator.Process(Snapshot(_start.AddSeconds(77), 75, stopped));
+        Assert.Equal(2, store.Query(null, null).Alerts.Count);
+    }
+
+    [Fact]
     public void StatusReportsProgressAndThresholds()
     {
         var evaluator = Create(out _);
@@ -86,12 +118,52 @@ public sealed class AlertEvaluatorTests
         Assert.Equal(19, temperature.DistanceToCritical);
     }
 
+    [Fact]
+    public void CustomRuleRaisesOnceAndCanSuppressPushNotification()
+    {
+        var dispatcher = new RecordingNotificationDispatcher();
+        var evaluator = Create(out var store, out var rules, dispatcher);
+        rules.Create(new CustomAlertRuleRequest("SSD running hot", "ssd-temp", AlertRuleDirection.Above,
+            70, 65, 10, AlertSeverity.Warning, true, false));
+        var sensor = new SensorReading("ssd-temp", "NVMe SSD", "Drive Temperature", "Temperature", 72, "°C");
+        evaluator.Process(Snapshot(_start, 60, sensor));
+        evaluator.Process(Snapshot(_start.AddSeconds(10), 60, sensor));
+        evaluator.Process(Snapshot(_start.AddSeconds(20), 60, sensor));
+
+        var alert = Assert.Single(store.Query(null, null).Alerts);
+        Assert.Contains("SSD running hot", alert.SensorName);
+        Assert.Empty(dispatcher.Alerts);
+    }
+
+    [Fact]
+    public void DuplicatePerCoreTemperaturesDoNotCreateBuiltInAlerts()
+    {
+        var evaluator = Create(out var store);
+        var core = new SensorReading("core-1", "Intel Core i7", "CPU Core 1 Temperature", "Temperature", 99, "°C");
+        evaluator.Process(Snapshot(_start, 70, core));
+        evaluator.Process(Snapshot(_start.AddSeconds(10), 70, core));
+        Assert.Empty(store.Query(null, null).Alerts);
+    }
+
     private AlertEvaluator Create(out AlertStore store)
     {
-        var options = Options.Create(new AlertOptions());
+        return Create(out store, out _, new NullNotificationDispatcher());
+    }
+
+    private AlertEvaluator Create(out AlertStore store, out CustomAlertRuleStore rules,
+        INotificationDispatcher notifications)
+    {
+        var options = Options.Create(new AlertOptions { RuleStoreFile = _rulesPath });
         store = new AlertStore(options, new FixedTimeProvider(_start), new LiveEventHub());
-        return new AlertEvaluator(options, store, new NullNotificationDispatcher(),
+        rules = new CustomAlertRuleStore(options, NullLogger<CustomAlertRuleStore>.Instance);
+        return new AlertEvaluator(options, store, notifications, rules,
             NullLogger<AlertEvaluator>.Instance);
+    }
+
+    public void Dispose()
+    {
+        if (File.Exists(_rulesPath)) File.Delete(_rulesPath);
+        if (File.Exists(_rulesPath + ".tmp")) File.Delete(_rulesPath + ".tmp");
     }
 
     private static SensorSnapshot Snapshot(DateTimeOffset timestamp, float value, params SensorReading[] additional) => new(timestamp,
@@ -105,5 +177,10 @@ public sealed class AlertEvaluatorTests
     private sealed class NullNotificationDispatcher : INotificationDispatcher
     {
         public void Enqueue(MonitorAlert alert) { }
+    }
+    private sealed class RecordingNotificationDispatcher : INotificationDispatcher
+    {
+        public List<MonitorAlert> Alerts { get; } = [];
+        public void Enqueue(MonitorAlert alert) => Alerts.Add(alert);
     }
 }

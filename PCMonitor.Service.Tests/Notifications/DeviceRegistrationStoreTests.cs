@@ -19,16 +19,16 @@ public sealed class DeviceRegistrationStoreTests : IDisposable
 
         var restored = CreateStore().GetAll();
         var device = Assert.Single(restored);
-        Assert.Equal("new-token", device.Token);
+        Assert.Equal("new-token", device.SendSecret);
         Assert.Equal(_now, device.UpdatedAt);
     }
 
     [Fact]
-    public void RemoveByTokenDeletesExpiredRegistration()
+    public void RemoveDeletesExpiredRegistration()
     {
         var store = CreateStore();
         store.Upsert(new("phone-1", "expired", MobilePlatform.Ios, null));
-        store.RemoveByToken("expired");
+        store.Remove("phone-1");
 
         Assert.Empty(CreateStore().GetAll());
     }

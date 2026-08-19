@@ -9,10 +9,12 @@
 
 LAN PC Monitor combines a lightweight Windows monitoring service with a companion app. It turns hardware-specific sensor labels into readable names, keeps recent history locally, and offers live dashboards, charts, temperature and resource-pressure alerts, fan-health checks, and load-session summaries.
 
-See [push notification setup](docs/PUSH_NOTIFICATIONS.md) to enable critical sensor alerts on Android or iOS.
+See [push notification setup](docs/PUSH_NOTIFICATIONS.md) to enable sensor alerts on Android or iOS.
 
-Monitoring runs on your own network with no account, telemetry service, remote relay, or router configuration. Optional
-phone notifications use Firebase Cloud Messaging only to deliver critical alerts.
+Monitoring, history, dashboards, and pairing stay on your local network with no account or telemetry. Optional phone
+notifications are the only feature that uses an internet server: the Windows service sends a small structured alert to
+the LAN PC Monitor notification relay, which forwards it through Firebase Cloud Messaging. The relay cannot access or
+control the monitored PC and does not receive sensor history. See the [notification relay architecture](docs/NOTIFICATION_RELAY.md).
 
 > [!IMPORTANT]
 > The current API uses unencrypted HTTP and WebSockets without authentication. Install it only on a trusted local network. Never forward port `5005` or expose it to the internet.
@@ -23,9 +25,10 @@ phone notifications use Firebase Cloud Messaging only to deliver critical alerts
 
 [**Download the latest Windows installer from GitHub Releases**](https://github.com/sam-schonenberg/lan-pc-monitor/releases/latest)
 
-Open the release's **Assets** section and download `LanPcMonitor-0.1.1-win-x64.msi`. Run the installer as an administrator. It installs:
+Open the release's **Assets** section and download `LanPcMonitor-0.1.7-win-x64.msi`. Run the installer as an administrator. It installs:
 
 - the background monitoring service;
+- the signed PawnIO hardware-access driver required for supported CPU and motherboard sensors;
 - the notification-area companion;
 - a Start Menu shortcut; and
 - a Windows Firewall rule limited to the local subnet.
@@ -68,6 +71,7 @@ The exact sensor set depends on the PC's hardware, drivers, permissions, and [Li
 | Windows service | Reads hardware sensors, records history, evaluates alerts, and exposes the LAN API. |
 | Android/MAUI app | Displays live readings, dashboards, alerts, and synchronized offline history. |
 | Tray companion | Opens the monitoring page and controls, enables, disables, or uninstalls the service. |
+| Notification relay | Forwards opt-in structured alerts to Firebase; it has no route into the PC and stores no alert history. |
 
 Monitoring data is stored under `%ProgramData%\LanPcMonitor` on the PC. The app keeps synchronized history and preferences in its private local database. Process monitoring retains only normalized process names such as `game.exe` and aggregate CPU statistics during detected load sessions—never paths, command lines, window titles, documents, memory contents, or network activity.
 
@@ -123,7 +127,7 @@ dotnet build .\PCMonitor.Application\PCMonitor.Application.csproj -f net10.0-and
 Build the self-contained Windows MSI with:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.1
+.\scripts\build-installer.ps1 -Version 0.1.7
 ```
 
 Release maintainers should follow the [release checklist](docs/RELEASING.md).
@@ -139,6 +143,7 @@ Service settings live in [`PCMonitor.Service/appsettings.json`](PCMonitor.Servic
 | `HistoricalMonitoring` | Bucket duration, retention, and API limits. |
 | `ProcessMonitoring` | Dominant-process sampling during load sessions. |
 | `Alerts` | Temperature thresholds, hysteresis, and retention. |
+| `Notifications` | Opt-in HTTPS relay URL, minimum severity, and delivery interval. |
 | `Server` | LAN API port; default `5005`. |
 | `Setup` | Optional app-store links on the pairing page. |
 
@@ -162,8 +167,10 @@ If you change the service port, update the firewall rule to match:
 - [API reference](docs/API.md)
 - [Installer and updates](docs/INSTALLER.md)
 - [Security and safe deployment](docs/SECURITY.md)
+- [Notification relay architecture](docs/NOTIFICATION_RELAY.md)
+- [Push notification setup](docs/PUSH_NOTIFICATIONS.md)
 - [Release checklist](docs/RELEASING.md)
-- [v0.1.1 release notes](docs/RELEASE_NOTES_0.1.1.md)
+- [v0.1.7 release notes](docs/RELEASE_NOTES_0.1.7.md)
 
 ## Contributing
 

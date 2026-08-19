@@ -12,23 +12,25 @@ public sealed class AlertEvaluator
     private readonly ILogger<AlertEvaluator> _logger;
     private readonly AlertOptions _options;
     private readonly INotificationDispatcher _notifications;
+    private readonly CustomAlertRuleStore _customRules;
     private DateTimeOffset? _lastEvaluation;
 
     public AlertEvaluator(IOptions<AlertOptions> options, AlertStore store, INotificationDispatcher notifications,
-        ILogger<AlertEvaluator> logger)
-    { _options = Normalize(options.Value, logger); _store = store; _logger = logger; _notifications = notifications; }
+        CustomAlertRuleStore customRules, ILogger<AlertEvaluator> logger)
+    { _options = Normalize(options.Value, logger); _store = store; _logger = logger; _notifications = notifications;
+        _customRules = customRules; }
 
     public void Process(SensorSnapshot snapshot)
     {
         if (!_options.Enabled) return;
-        List<MonitorAlert> raised = [];
+        List<RaisedAlert> raised = [];
         lock (_sync)
         {
             if (_lastEvaluation is { } last && snapshot.Timestamp - last < TimeSpan.FromSeconds(_options.EvaluationIntervalSeconds)) return;
             _lastEvaluation = snapshot.Timestamp;
             foreach (var sensor in snapshot.Sensors.Where(x => x.Value is not null && float.IsFinite(x.Value.Value)))
             {
-                if (IsTemperature(sensor)) EvaluateHigh("temperature", sensor, snapshot.Timestamp,
+                if (IsPrimaryTemperature(sensor)) EvaluateHigh("temperature", sensor, snapshot.Timestamp,
                     _options.Temperature.WarningThresholdCelsius, _options.Temperature.CriticalThresholdCelsius,
                     _options.Temperature.ResetBelowCelsius, _options.Temperature.MinimumDurationSeconds, raised);
                 else if (_options.MemoryPressure.Enabled && IsMemoryPressure(sensor)) EvaluateHigh("memory", sensor, snapshot.Timestamp,
@@ -37,12 +39,19 @@ public sealed class AlertEvaluator
                 else if (_options.Utilization.Enabled && IsUtilization(sensor)) EvaluateHigh("utilization", sensor, snapshot.Timestamp,
                     _options.Utilization.WarningThreshold, _options.Utilization.CriticalThreshold,
                     _options.Utilization.ResetBelow, _options.Utilization.MinimumDurationSeconds, raised);
-                else if (_options.Fan.Enabled && IsFan(sensor)) EvaluateFan(sensor, snapshot, raised);
+                else if (_options.Fan.Enabled && IsMonitoredFan(sensor)) EvaluateFan(sensor, snapshot, raised);
+            }
+            foreach (var rule in _customRules.GetAll().Where(x => x.Enabled))
+            {
+                var sensor = snapshot.Sensors.FirstOrDefault(x => x.Id == rule.SensorId && x.Value is not null &&
+                    float.IsFinite(x.Value.Value));
+                if (sensor is not null) EvaluateCustom(rule, sensor, snapshot.Timestamp, raised);
             }
         }
-        foreach (var alert in raised)
+        foreach (var item in raised)
         {
-            _store.Add(alert); _notifications.Enqueue(alert);
+            var alert = item.Alert;
+            _store.Add(alert); if (item.Notify) _notifications.Enqueue(alert);
             try { _logger.LogWarning("{Severity} alert raised for {Sensor}: {Value}{Unit}", alert.Severity,
                 alert.SensorName, alert.Value, alert.Unit); } catch { }
         }
@@ -55,15 +64,15 @@ public sealed class AlertEvaluator
             List<AlertMetricStatus> result = [];
             foreach (var sensor in snapshot.Sensors.Where(x => x.Value is not null && float.IsFinite(x.Value.Value)))
             {
-                if (IsTemperature(sensor) && IsStatusTemperature(sensor)) result.Add(Status("temperature", "high", sensor, snapshot.Timestamp,
+                if (IsPrimaryTemperature(sensor)) result.Add(Status("temperature", "high", sensor, snapshot.Timestamp,
                     _options.Temperature.WarningThresholdCelsius, _options.Temperature.CriticalThresholdCelsius, null));
                 else if (_options.MemoryPressure.Enabled && IsMemoryPressure(sensor)) result.Add(Status("memory", "high", sensor,
                     snapshot.Timestamp, _options.MemoryPressure.WarningThreshold, _options.MemoryPressure.CriticalThreshold, null));
                 else if (_options.Utilization.Enabled && IsUtilization(sensor)) result.Add(Status("utilization", "high", sensor,
                     snapshot.Timestamp, _options.Utilization.WarningThreshold, _options.Utilization.CriticalThreshold, null));
-                else if (_options.Fan.Enabled && IsFan(sensor))
+                else if (_options.Fan.Enabled && IsMonitoredFan(sensor))
                 {
-                    var hot = HardwareTemperature(snapshot, sensor.Hardware);
+                    var hot = FanTemperature(snapshot, sensor);
                     result.Add(Status("fan", "low", sensor, snapshot.Timestamp, _options.Fan.WarningBelowRpm,
                         _options.Fan.CriticalBelowRpm, hot >= _options.Fan.HardwareTemperatureGateCelsius
                             ? $"Hardware temperature is {hot:0.#}°C." : $"Armed above {_options.Fan.HardwareTemperatureGateCelsius:0.#}°C."));
@@ -74,7 +83,7 @@ public sealed class AlertEvaluator
     }
 
     private void EvaluateHigh(string category, SensorReading sensor, DateTimeOffset timestamp, double warning,
-        double critical, double reset, double duration, List<MonitorAlert> raised)
+        double critical, double reset, double duration, List<RaisedAlert> raised)
     {
         var value = sensor.Value!.Value;
         AlertSeverity? target = value >= critical ? AlertSeverity.Critical : value >= warning ? AlertSeverity.Warning : null;
@@ -82,19 +91,33 @@ public sealed class AlertEvaluator
             target == AlertSeverity.Critical ? critical : warning, raised);
     }
 
-    private void EvaluateFan(SensorReading sensor, SensorSnapshot snapshot, List<MonitorAlert> raised)
+    private void EvaluateFan(SensorReading sensor, SensorSnapshot snapshot, List<RaisedAlert> raised)
     {
         var value = sensor.Value!.Value;
-        var hot = HardwareTemperature(snapshot, sensor.Hardware) >= _options.Fan.HardwareTemperatureGateCelsius;
+        var hot = FanTemperature(snapshot, sensor) >= _options.Fan.HardwareTemperatureGateCelsius;
         AlertSeverity? target = hot ? value <= _options.Fan.CriticalBelowRpm ? AlertSeverity.Critical
             : value <= _options.Fan.WarningBelowRpm ? AlertSeverity.Warning : null : null;
-        Evaluate("fan", sensor, snapshot.Timestamp, target, !hot || value > _options.Fan.ResetAboveRpm,
+        // Once raised, a fan alert remains latched until RPM recovers. Cooling below the
+        // temperature gate is not proof that a stopped fan started working again.
+        Evaluate("fan", sensor, snapshot.Timestamp, target, value > _options.Fan.ResetAboveRpm,
             _options.Fan.MinimumDurationSeconds, target == AlertSeverity.Critical
                 ? _options.Fan.CriticalBelowRpm : _options.Fan.WarningBelowRpm, raised);
     }
 
+    private void EvaluateCustom(CustomAlertRule rule, SensorReading sensor, DateTimeOffset timestamp,
+        List<RaisedAlert> raised)
+    {
+        var value = sensor.Value!.Value;
+        var triggered = rule.Direction == AlertRuleDirection.Above ? value >= rule.Threshold : value <= rule.Threshold;
+        var reset = rule.Direction == AlertRuleDirection.Above ? value < rule.ResetThreshold : value > rule.ResetThreshold;
+        Evaluate($"custom:{rule.Id:N}", sensor, timestamp, triggered ? rule.Severity : null, reset,
+            rule.MinimumDurationSeconds, rule.Threshold, raised, rule.NotificationsEnabled, rule.Name,
+            $"{rule.Name}: {sensor.Name} is {value:0.#}{sensor.Unit}." );
+    }
+
     private void Evaluate(string category, SensorReading sensor, DateTimeOffset timestamp, AlertSeverity? target,
-        bool reset, double duration, double threshold, List<MonitorAlert> raised)
+        bool reset, double duration, double threshold, List<RaisedAlert> raised, bool notify = true,
+        string? alertName = null, string? message = null)
     {
         var key = Key(category, sensor.Id);
         if (!_states.TryGetValue(key, out var state)) _states[key] = state = new();
@@ -104,9 +127,10 @@ public sealed class AlertEvaluator
         if (state.Candidate != target) { state.Candidate = target; state.CandidateSince = timestamp; }
         if (timestamp - state.CandidateSince < TimeSpan.FromSeconds(duration)) return;
         state.Active = target; state.Candidate = null;
-        raised.Add(new(Guid.NewGuid(), timestamp, target.Value, sensor.Id, sensor.Hardware, sensor.Name, sensor.Type,
+        raised.Add(new(new(Guid.NewGuid(), timestamp, target.Value, sensor.Id, sensor.Hardware,
+            alertName is null ? sensor.Name : $"{alertName} · {sensor.Name}", sensor.Type,
             sensor.Value!.Value, threshold, sensor.Unit,
-            $"{sensor.Name} {(category == "fan" ? "fell to" : "reached")} {sensor.Value.Value:0.#}{sensor.Unit}."));
+            message ?? $"{sensor.Name} {(category == "fan" ? "fell to" : "reached")} {sensor.Value.Value:0.#}{sensor.Unit}."), notify));
     }
 
     private AlertMetricStatus Status(string category, string direction, SensorReading sensor, DateTimeOffset timestamp,
@@ -128,17 +152,51 @@ public sealed class AlertEvaluator
     }
 
     private static bool IsTemperature(SensorReading x) => x.Type.Equals("Temperature", StringComparison.OrdinalIgnoreCase);
-    private static bool IsStatusTemperature(SensorReading x) =>
-        !x.Name.Contains("CPU Core ", StringComparison.OrdinalIgnoreCase);
+    private static bool IsPrimaryTemperature(SensorReading x)
+    {
+        if (!IsTemperature(x) || x.Name.Contains("Distance to", StringComparison.OrdinalIgnoreCase)) return false;
+        var cpu = x.Hardware.Contains("CPU", StringComparison.OrdinalIgnoreCase) ||
+                  x.Hardware.Contains("Intel", StringComparison.OrdinalIgnoreCase) ||
+                  x.Hardware.Contains("Ryzen", StringComparison.OrdinalIgnoreCase);
+        var gpu = x.Hardware.Contains("GPU", StringComparison.OrdinalIgnoreCase) ||
+                  x.Hardware.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
+                  x.Hardware.Contains("Radeon", StringComparison.OrdinalIgnoreCase);
+        return cpu && (x.Name.Contains("Package", StringComparison.OrdinalIgnoreCase) ||
+                       x.Name.Contains("Tctl", StringComparison.OrdinalIgnoreCase) ||
+                       x.Name.Contains("Tdie", StringComparison.OrdinalIgnoreCase)) ||
+               gpu && x.Name.Contains("Core", StringComparison.OrdinalIgnoreCase);
+    }
     private static bool IsFan(SensorReading x) => x.Type.Equals("Fan", StringComparison.OrdinalIgnoreCase);
+    private bool IsMonitoredFan(SensorReading x)
+    {
+        if (!IsFan(x)) return false;
+        return _options.Fan.MonitorCpuFans && x.Name.Contains("CPU Fan", StringComparison.OrdinalIgnoreCase) ||
+               _options.Fan.MonitorGpuFans && x.Name.Contains("GPU Fan", StringComparison.OrdinalIgnoreCase);
+    }
     private static bool IsMemoryPressure(SensorReading x) => x.Type.Equals("Load", StringComparison.OrdinalIgnoreCase) &&
-        (x.Name.Contains("Memory", StringComparison.OrdinalIgnoreCase) || x.Name.Contains("VRAM", StringComparison.OrdinalIgnoreCase));
+        x.Name.Contains("Memory Usage", StringComparison.OrdinalIgnoreCase) &&
+        (x.Hardware.Contains("Total Memory", StringComparison.OrdinalIgnoreCase) ||
+         x.Hardware.Equals("Memory", StringComparison.OrdinalIgnoreCase));
     private static bool IsUtilization(SensorReading x) => x.Type.Equals("Load", StringComparison.OrdinalIgnoreCase) && !IsMemoryPressure(x) &&
         (x.Name.Contains("Overall CPU", StringComparison.OrdinalIgnoreCase) || x.Name.Contains("CPU Total", StringComparison.OrdinalIgnoreCase) ||
          x.Name.Contains("GPU Core", StringComparison.OrdinalIgnoreCase));
     private static double HardwareTemperature(SensorSnapshot snapshot, string hardware) => snapshot.Sensors
-        .Where(x => x.Hardware == hardware && IsTemperature(x) && x.Value is not null).Select(x => (double)x.Value!.Value)
+        .Where(x => x.Hardware == hardware && IsActualTemperature(x)).Select(x => (double)x.Value!.Value)
         .DefaultIfEmpty(double.NegativeInfinity).Max();
+    private static double FanTemperature(SensorSnapshot snapshot, SensorReading fan)
+    {
+        if (fan.Name.Contains("CPU Fan", StringComparison.OrdinalIgnoreCase))
+            return snapshot.Sensors.Where(x => IsActualTemperature(x) &&
+                    (x.Hardware.Contains("CPU", StringComparison.OrdinalIgnoreCase) ||
+                     x.Hardware.Contains("Intel", StringComparison.OrdinalIgnoreCase) ||
+                     x.Hardware.Contains("Ryzen", StringComparison.OrdinalIgnoreCase) ||
+                     x.Name.Contains("CPU Package", StringComparison.OrdinalIgnoreCase) ||
+                     x.Name.Contains("Core Max", StringComparison.OrdinalIgnoreCase)))
+                .Select(x => (double)x.Value!.Value).DefaultIfEmpty(double.NegativeInfinity).Max();
+        return HardwareTemperature(snapshot, fan.Hardware);
+    }
+    private static bool IsActualTemperature(SensorReading x) => IsTemperature(x) && x.Value is not null &&
+        !x.Name.Contains("Distance to", StringComparison.OrdinalIgnoreCase);
     private static string Key(string category, string sensorId) => $"{category}:{sensorId}";
 
     private static AlertOptions Normalize(AlertOptions source, ILogger logger)
@@ -162,4 +220,5 @@ public sealed class AlertEvaluator
 
     private sealed class SensorAlertState
     { public AlertSeverity? Active { get; set; } public AlertSeverity? Candidate { get; set; } public DateTimeOffset CandidateSince { get; set; } }
+    private sealed record RaisedAlert(MonitorAlert Alert, bool Notify);
 }

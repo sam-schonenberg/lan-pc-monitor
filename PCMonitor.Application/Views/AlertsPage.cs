@@ -1,4 +1,5 @@
 using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Extensions.DependencyInjection;
 using PCMonitor.Application.Data.Entities;
 using PCMonitor.Application.ViewModels;
 
@@ -7,8 +8,10 @@ namespace PCMonitor.Application.Views;
 public sealed class AlertsPage : ContentPage
 {
     private readonly AlertsViewModel _viewModel;
-    public AlertsPage(AlertsViewModel viewModel)
+    private readonly IServiceProvider _services;
+    public AlertsPage(AlertsViewModel viewModel, IServiceProvider services)
     {
+        _services = services;
         Title = "Alerts"; BindingContext = _viewModel = viewModel;
         this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
         var list = new CollectionView
@@ -64,6 +67,9 @@ public sealed class AlertsPage : ContentPage
         notificationGrid.SetColumn(notification, 1);
         var filters = new HorizontalStackLayout { Spacing = 8,
             Children = { FilterButton("All", "all"), FilterButton("Critical", "critical"), FilterButton("Warning", "warning") } };
+        var manageRules = new Button { Text = "Manage custom alert rules", HorizontalOptions = LayoutOptions.Fill };
+        manageRules.Clicked += async (_, _) => await Navigation.PushAsync(
+            _services.GetRequiredService<AlertRulesPage>());
         return new VerticalStackLayout
         {
             Spacing = 12, Padding = new Thickness(0, 18, 0, 12),
@@ -72,6 +78,7 @@ public sealed class AlertsPage : ContentPage
                 new Label { Text = "ALERTS", FontSize = 25, FontAttributes = FontAttributes.Bold },
                 Card(healthGrid),
                 Card(new VerticalStackLayout { Spacing = 5, Children = { notificationGrid, update } }),
+                manageRules,
                 new Label { Text = "Live alert status", FontSize = 20, FontAttributes = FontAttributes.Bold,
                     Margin = new Thickness(0, 6, 0, 0) }, metrics, noMetrics,
                 new Label { Text = "Recent alerts", FontSize = 20, FontAttributes = FontAttributes.Bold,
