@@ -79,6 +79,7 @@ apps, desktop apps, and server-side clients can call it directly.
 | `PUT` | `/api/v1/alert-rules/{id}` | Replace an existing custom rule. |
 | `DELETE` | `/api/v1/alert-rules/{id}` | Delete a custom rule. |
 | `GET` | `/api/v1/notifications/status` | Push configuration and registered-device count. |
+| `POST` | `/api/v1/notifications/test-overheating` | Queue a simulated critical GPU alert; loopback requests only. |
 | `POST` | `/api/v1/notifications/devices` | Register or refresh a mobile push token. |
 | `DELETE` | `/api/v1/notifications/devices/{installationId}` | Unregister a mobile installation. |
 | `GET` | `/api/v1/history` | Paged and filtered historical readings. |

@@ -2,7 +2,7 @@
 
 [Back to project overview](../README.md) · [Installer and updates](INSTALLER.md)
 
-This checklist keeps the Windows installer, Android bundle, source tag, and GitHub release on the same version. Public releases use semantic tags such as `v0.1.1`.
+This checklist keeps the Windows installer, Android bundle, source tag, and GitHub release on the same version. Public releases use semantic tags such as `v0.1.7`.
 
 ## 1. Prepare the source
 
@@ -46,6 +46,10 @@ Build an Android App Bundle in Release configuration, using the existing Play up
 - the upload-certificate SHA-256 fingerprint matches the previous release.
 
 Upload the `.aab` to the intended Play testing or production track and complete Play's review flow.
+
+Before production publication, confirm that the required Google Play closed-test participation has completed. Until
+then, keep the README's alpha-tester request and private-testing status accurate; remove or revise them only when the
+public Play listing is live.
 
 ## 5. Create the Git tag and GitHub release
 
