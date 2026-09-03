@@ -1,17 +1,20 @@
 using PCMonitor.Application.ViewModels;
 using Microsoft.Maui.Controls.Shapes;
 using PCMonitor.Application.Controls;
+using PCMonitor.Application.Models;
+using PCMonitor.Application.Services.Export;
 
 namespace PCMonitor.Application.Views;
 
 public sealed class HistoryPage : ContentPage
 {
     private readonly HistoryViewModel _viewModel;
+    private readonly GraphImageExportService _graphImageExport;
 
-    public HistoryPage(HistoryViewModel viewModel)
+    public HistoryPage(HistoryViewModel viewModel, GraphImageExportService graphImageExport)
     {
-        Title = "History"; BindingContext = _viewModel = viewModel;
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        Title = "History"; BindingContext = _viewModel = viewModel; _graphImageExport = graphImageExport;
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
 
         var records = new CollectionView
         {
@@ -28,7 +31,7 @@ public sealed class HistoryPage : ContentPage
 
         var refresh = new RefreshView { Content = records };
         refresh.SetBinding(RefreshView.CommandProperty, nameof(viewModel.RefreshCommand));
-        refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(viewModel.IsRefreshing));
+        refresh.SetBinding(RefreshView.IsRefreshingProperty, nameof(viewModel.IsRefreshing), mode: BindingMode.TwoWay);
         Content = refresh;
     }
 
@@ -77,6 +80,43 @@ public sealed class HistoryPage : ContentPage
         };
         filters.SetColumn(filters.Children[1], 1);
 
+        var addComparison = new Button { Text = "+ Add sensor", FontSize = 12, Padding = new Thickness(10, 5),
+            MinimumHeightRequest = 38, HorizontalOptions = LayoutOptions.Start };
+        addComparison.Clicked += async (_, _) => await ShowComparisonPickerAsync();
+        var selectedSensors = new HorizontalStackLayout { Spacing = 6 };
+        BindableLayout.SetItemsSource(selectedSensors, _viewModel.SelectedSensors);
+        BindableLayout.SetItemTemplate(selectedSensors, new DataTemplate(() =>
+        {
+            var name = new Label { FontSize = 11, VerticalTextAlignment = TextAlignment.Center,
+                LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1 };
+            name.SetBinding(Label.TextProperty, nameof(HistorySensorOption.DisplayName));
+            var remove = new Button { Text = "×", FontSize = 14, Padding = 0, WidthRequest = 28,
+                HeightRequest = 30, MinimumHeightRequest = 30 };
+            remove.BindingContextChanged += (_, _) =>
+            {
+                if (remove.BindingContext is HistorySensorOption option)
+                    remove.IsVisible = option.Id != _viewModel.SelectedSensor?.Id;
+            };
+            remove.Clicked += async (sender, _) =>
+            {
+                if ((sender as BindableObject)?.BindingContext is HistorySensorOption option)
+                    await _viewModel.RemoveComparisonAsync(option);
+            };
+            var row = new HorizontalStackLayout { Spacing = 3, Children = { name, remove } };
+            return Card(row, 5);
+        }));
+        var comparisonStrip = new HorizontalStackLayout
+        {
+            Spacing = 8,
+            Children =
+            {
+                new Label { Text = "Compare", FontSize = 12, FontAttributes = FontAttributes.Bold,
+                    VerticalTextAlignment = TextAlignment.Center },
+                selectedSensors,
+                addComparison
+            }
+        };
+
         var sensorName = new Label { FontSize = 15, FontAttributes = FontAttributes.Bold,
             LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1 };
         sensorName.SetBinding(Label.TextProperty, nameof(_viewModel.ChartSensorName));
@@ -86,25 +126,49 @@ public sealed class HistoryPage : ContentPage
             $"{nameof(_viewModel.SelectedSensor)}.{nameof(HistorySensorOption.Details)}");
         var chartTitle = new VerticalStackLayout { Spacing = 2,
             Children = { sensorName, sensorDetails } };
-        var chartRange = new Label { FontSize = 15, FontAttributes = FontAttributes.Bold,
-            HorizontalOptions = LayoutOptions.Fill, HorizontalTextAlignment = TextAlignment.End,
-            VerticalTextAlignment = TextAlignment.Center };
-        chartRange.SetBinding(Label.TextProperty, nameof(_viewModel.ChartRangeLabel));
+        var exportGraph = new Button { Text = "⇩", FontSize = 17, Padding = 0, WidthRequest = 36,
+            HeightRequest = 34, MinimumHeightRequest = 34, HorizontalOptions = LayoutOptions.End };
+        SemanticProperties.SetDescription(exportGraph, "Save this sensor graph as an image");
+        exportGraph.Clicked += async (_, _) =>
+        {
+            var group = _viewModel.ChartGroups.FirstOrDefault();
+            if (group is null) return;
+            exportGraph.IsEnabled = false;
+            try
+            {
+                var result = await _graphImageExport.GenerateAndSaveAsync(new GraphImageExportRequest(
+                    _viewModel.ChartTitle, _viewModel.ChartRangeLabel, _viewModel.SelectedRange.Duration,
+                    _viewModel.ChartRangeEnd, group.Unit, [], group.Series, true, false, false,
+                    group.Series.Count == 1 ? _viewModel.Latest : null));
+                await Navigation.PushAsync(new ExportPreviewPage(result, _graphImageExport));
+            }
+            catch (Exception exception) { await DisplayAlertAsync("Could not save graph", exception.Message, "OK"); }
+            finally { exportGraph.IsEnabled = true; }
+        };
         var chartHeading = new Grid
         {
             ColumnDefinitions = { new(GridLength.Star), new(new GridLength(52)) }, ColumnSpacing = 12,
-            Children = { chartTitle, chartRange }
+            Children = { chartTitle, exportGraph }
         };
-        chartHeading.SetColumn(chartRange, 1);
+        chartHeading.SetColumn(exportGraph, 1);
 
-        var chartContent = new SensorChart { ShowAverage = true, ShowMinimum = true, ShowMaximum = true };
-        chartContent.SetBinding(SensorChart.PointsProperty, nameof(_viewModel.ChartPoints));
-        chartContent.SetBinding(SensorChart.UnitProperty, $"{nameof(_viewModel.SelectedSensor)}.{nameof(HistorySensorOption.Unit)}");
-        chartContent.SetBinding(SensorChart.SensorNameProperty, $"{nameof(_viewModel.SelectedSensor)}.{nameof(HistorySensorOption.Name)}");
-        chartContent.SetBinding(SensorChart.RangeDurationProperty, $"{nameof(_viewModel.SelectedRange)}.{nameof(HistoryRangeOption.Duration)}");
-        chartContent.SetBinding(SensorChart.RangeEndProperty, nameof(_viewModel.ChartRangeEnd));
-        chartContent.SetBinding(SensorChart.IsLoadingProperty, nameof(_viewModel.IsChartLoading));
-        chartContent.SetBinding(SensorChart.ErrorMessageProperty, nameof(_viewModel.ChartErrorMessage));
+        var charts = new VerticalStackLayout { Spacing = 10 };
+        BindableLayout.SetItemsSource(charts, _viewModel.ChartGroups);
+        BindableLayout.SetItemTemplate(charts, new DataTemplate(() =>
+        {
+            var chart = new SensorChart { ShowAverage = true, ShowMinimum = false, ShowMaximum = false };
+            chart.SetBinding(SensorChart.ComparisonSeriesProperty, nameof(SensorGraphGroup.Series));
+            chart.SetBinding(SensorChart.UnitProperty, nameof(SensorGraphGroup.Unit));
+            chart.SetBinding(SensorChart.RangeDurationProperty, new Binding(
+                $"BindingContext.{nameof(_viewModel.SelectedRange)}.{nameof(HistoryRangeOption.Duration)}", source: this));
+            chart.SetBinding(SensorChart.RangeEndProperty, new Binding(
+                $"BindingContext.{nameof(_viewModel.ChartRangeEnd)}", source: this));
+            chart.SetBinding(SensorChart.IsLoadingProperty, new Binding(
+                $"BindingContext.{nameof(_viewModel.IsChartLoading)}", source: this));
+            chart.SetBinding(SensorChart.ErrorMessageProperty, new Binding(
+                $"BindingContext.{nameof(_viewModel.ChartErrorMessage)}", source: this));
+            return chart;
+        }));
 
         var statistics = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) } };
         statistics.Add(Statistic("Average", nameof(_viewModel.Average)), 0);
@@ -119,7 +183,7 @@ public sealed class HistoryPage : ContentPage
         var error = new Label { FontSize = 12, TextColor = Colors.DarkOrange };
         error.SetBinding(Label.TextProperty, nameof(_viewModel.ErrorMessage));
 
-        var syncProgress = new ProgressBar { HeightRequest = 5, ProgressColor = Color.FromArgb("#512BD4") };
+        var syncProgress = new ProgressBar { HeightRequest = 5 };
         syncProgress.SetBinding(ProgressBar.ProgressProperty, nameof(_viewModel.HistorySyncProgress));
         syncProgress.SetBinding(IsVisibleProperty, nameof(_viewModel.IsHistorySyncing));
         var syncProgressText = new Label { FontSize = 12, Opacity = 0.75 };
@@ -135,10 +199,23 @@ public sealed class HistoryPage : ContentPage
             Padding = new Thickness(0, 18, 0, 12), Spacing = 14,
             Children =
             {
-                filters, chartHeading, chartContent, Card(statistics, 14), detailHeading, status, error,
+                filters, Card(comparisonStrip, 8), chartHeading, charts, Card(statistics, 14), detailHeading, status, error,
                 syncProgress, syncProgressText, loading
             }
         };
+    }
+
+    private async Task ShowComparisonPickerAsync()
+    {
+        var primary = _viewModel.SelectedSensor;
+        var available = _viewModel.AvailableSensors.Where(x =>
+            _viewModel.SelectedSensors.All(y => y.Id != x.Id) &&
+            (primary is null || GraphCompatibility.AreCompatible(primary.Type, primary.Unit, x.Type, x.Unit))).ToArray();
+        if (available.Length == 0) return;
+        var labels = available.Select(x => x.DisplayName).ToArray();
+        var choice = await DisplayActionSheetAsync("Add sensor comparison", "Cancel", null, labels);
+        var selected = available.FirstOrDefault(x => x.DisplayName == choice);
+        if (selected is not null) await _viewModel.AddComparisonAsync(selected);
     }
 
     private static View CreateRecordCard()
@@ -197,8 +274,8 @@ public sealed class HistoryPage : ContentPage
     {
         var border = new Border { Content = content, Padding = padding, Margin = margin ?? Thickness.Zero,
             StrokeShape = new RoundRectangle { CornerRadius = 14 }, StrokeThickness = 1 };
-        border.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#212121"));
-        border.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#404040"));
+        border.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+        border.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         return border;
     }
 }

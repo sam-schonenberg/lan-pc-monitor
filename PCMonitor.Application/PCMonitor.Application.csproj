@@ -36,8 +36,8 @@
 		<ApplicationId>dev.schonenberg.lanpcmonitor</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>0.1.7</ApplicationDisplayVersion>
-		<ApplicationVersion>7</ApplicationVersion>
+		<ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
+		<ApplicationVersion>8</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
@@ -75,6 +75,9 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<!-- The graph exporter reads the logo bytes directly for Skia rendering. -->
+		<MauiAsset Include="Resources\Images\logo.png" LogicalName="logo.png" />
+		<MauiAsset Include="Resources\AppIcon\appicon_Clean.png" LogicalName="export-appicon.png" />
 	</ItemGroup>
 
 	<ItemGroup>

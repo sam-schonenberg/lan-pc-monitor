@@ -196,6 +196,21 @@ public sealed class HistoryRepository(AppDatabase database)
             .ToListAsync();
     }
 
+    public async Task<IReadOnlyList<HistoricalSensorEntity>> GetAllHistoryAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var connection = await database.GetConnectionAsync();
+        var rows = await connection.QueryAsync<HistoricalSensorEntity>(
+            """
+            SELECT * FROM HistoricalSensors
+            WHERE BucketStartUtcTicks >= ? AND BucketStartUtcTicks < ?
+            ORDER BY BucketStartUtcTicks, Hardware, SensorName
+            """, from.UtcTicks, to.UtcTicks);
+        cancellationToken.ThrowIfCancellationRequested();
+        return rows;
+    }
+
     public async Task<IReadOnlyList<HistoricalSensorEntity>> GetSensorHistoryPageAsync(
         string sensorId, DateTimeOffset from, DateTimeOffset to, DateTimeOffset? before,
         int limit = DetailPageSize, CancellationToken cancellationToken = default)

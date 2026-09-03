@@ -25,6 +25,7 @@ public partial class HistoryViewModel(
     private long _chartGeneration;
     private bool _initialized;
     private bool _updatingSensorOptions;
+    private bool _refreshInProgress;
 
     public ObservableCollection<HistorySensorOption> AvailableSensors { get; } = [];
     public ObservableCollection<HistoryRangeOption> AvailableRanges { get; } =
@@ -37,6 +38,8 @@ public partial class HistoryViewModel(
         new(HistoryRange.OneYear, "1 year", "1y", TimeSpan.FromDays(365))
     ];
     public ObservableCollection<HistoryRecordItem> DetailedRecords { get; } = [];
+    public ObservableCollection<HistorySensorOption> SelectedSensors { get; } = [];
+    public ObservableCollection<SensorGraphGroup> ChartGroups { get; } = [];
 
     // Compatibility aliases for the original placeholder bindings.
     public ObservableCollection<HistorySensorOption> Sensors => AvailableSensors;
@@ -78,6 +81,11 @@ public partial class HistoryViewModel(
         OnPropertyChanged(nameof(ChartSensorType));
         OnPropertyChanged(nameof(ChartSensorHardware));
         OnPropertyChanged(nameof(ChartSensorName));
+        if (!_updatingSensorOptions)
+        {
+            SelectedSensors.Clear();
+            if (value is not null) SelectedSensors.Add(value);
+        }
         if (!_initialized || _updatingSensorOptions) return;
         if (value is not null) _ = settings.SetHistorySensorIdAsync(value.Id);
         _ = ResetAndLoadAsync();
@@ -150,6 +158,22 @@ public partial class HistoryViewModel(
     [RelayCommand]
     public async Task LoadAsync() => await ResetAndLoadAsync();
 
+    public async Task AddComparisonAsync(HistorySensorOption sensor)
+    {
+        if (SelectedSensors.Any(x => x.Id == sensor.Id)) return;
+        if (SelectedSensor is not null && !GraphCompatibility.AreCompatible(
+                SelectedSensor.Type, SelectedSensor.Unit, sensor.Type, sensor.Unit)) return;
+        SelectedSensors.Add(sensor);
+        await ReloadChartsAsync();
+    }
+
+    public async Task RemoveComparisonAsync(HistorySensorOption sensor)
+    {
+        if (sensor.Id == SelectedSensor?.Id) return;
+        SelectedSensors.Remove(sensor);
+        await ReloadChartsAsync();
+    }
+
     [RelayCommand]
     public async Task LoadMoreAsync()
     {
@@ -174,7 +198,8 @@ public partial class HistoryViewModel(
     [RelayCommand]
     public async Task RefreshAsync()
     {
-        if (IsRefreshing) return;
+        if (_refreshInProgress) return;
+        _refreshInProgress = true;
         IsRefreshing = true; OnPropertyChanged(nameof(IsBusy));
         IsHistorySyncing = true;
         HistorySyncProgress = 0.03;
@@ -203,6 +228,7 @@ public partial class HistoryViewModel(
         {
             IsRefreshing = false;
             IsHistorySyncing = false;
+            _refreshInProgress = false;
             OnPropertyChanged(nameof(IsBusy));
         }
     }
@@ -229,7 +255,7 @@ public partial class HistoryViewModel(
                 HistoryRepository.DetailPageSize, token);
             // The chart can aggregate substantially more data for long ranges. Keep it on its own
             // loading state so it cannot hold the statistics and detailed history UI hostage.
-            _ = LoadChartAsync(SelectedSensor, SelectedRange, _rangeFrom, _rangeTo);
+            _ = ReloadChartsAsync();
             await Task.WhenAll(statisticsTask, pageTask);
             if (generation != _loadGeneration || token.IsCancellationRequested) return;
 
@@ -249,8 +275,7 @@ public partial class HistoryViewModel(
         finally { if (generation == _loadGeneration) { IsLoading = false; OnPropertyChanged(nameof(IsBusy)); } }
     }
 
-    private async Task LoadChartAsync(HistorySensorOption sensor, HistoryRangeOption range,
-        DateTimeOffset from, DateTimeOffset to)
+    private async Task ReloadChartsAsync()
     {
         _chartCancellation?.Cancel(); _chartCancellation?.Dispose();
         _chartCancellation = new CancellationTokenSource();
@@ -258,14 +283,29 @@ public partial class HistoryViewModel(
         IsChartLoading = true; ChartErrorMessage = string.Empty;
         try
         {
+            var range = SelectedRange;
+            var sensors = SelectedSensors.Count == 0 && SelectedSensor is not null
+                ? new[] { SelectedSensor } : SelectedSensors.ToArray();
             var resolution = range.Range switch
             {
                 HistoryRange.SevenDays or HistoryRange.ThirtyDays => SensorChartResolution.Hour,
                 HistoryRange.OneYear => SensorChartResolution.Day,
                 _ => SensorChartResolution.Minute
             };
-            var points = await repository.GetChartDataAsync(sensor.Id, from, to, resolution, token);
-            if (generation == _chartGeneration && !token.IsCancellationRequested) ChartPoints = points;
+            var loaded = await Task.WhenAll(sensors.Select(async sensor => new SensorGraphSeries(sensor.Id,
+                sensor.DisplayName, sensor.Unit,
+                await repository.GetChartDataAsync(sensor.Id, _rangeFrom, _rangeTo, resolution, token))));
+            if (generation == _chartGeneration && !token.IsCancellationRequested)
+            {
+                ChartGroups.Clear();
+                foreach (var group in loaded.GroupBy(series =>
+                {
+                    var option = sensors.First(x => x.Id == series.SensorId);
+                    return GraphCompatibility.Key(option.Type, option.Unit);
+                }))
+                    ChartGroups.Add(new SensorGraphGroup(group.Key, group.First().Unit, group.ToArray()));
+                ChartPoints = loaded.FirstOrDefault(x => x.SensorId == SelectedSensor?.Id)?.Points ?? [];
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)
@@ -329,6 +369,7 @@ public partial class HistoryViewModel(
     {
         HasSensors = false; HasMoreRecords = false;
         ChartPoints = Array.Empty<SensorChartPoint>();
+        ChartGroups.Clear(); SelectedSensors.Clear();
         StatusMessage = EmptyMessage = "No sensor catalog is available yet. Connect to the PC and synchronize first.";
     }
 }

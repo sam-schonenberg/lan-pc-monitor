@@ -7,12 +7,20 @@
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
 </div>
 
+> [!IMPORTANT]
+> ### Want to try the Android app?
+>
+> I no longer publish prebuilt APK files on GitHub. If you would like to try LAN PC Monitor, send me a friend request
+> on Discord using the username **`schonenbergdev`** and let me know that you would like to test the app.
+>
+> [**💬 Open Discord and add `schonenbergdev`**](https://discord.com/channels/@me)
+
 LAN PC Monitor combines a lightweight Windows monitoring service with a companion app. It turns hardware-specific sensor labels into readable names, keeps recent history locally, and offers live dashboards, charts, temperature and resource-pressure alerts, fan-health checks, and load-session summaries.
 
 > [!NOTE]
 > **LAN PC Monitor is entering alpha testing, and I am looking for Android testers.** Google Play testing is the
 > remaining step before the app can be published to the Play Store. If you would like to help test the app, please
-> contact the maintainer through GitHub.
+> add **`schonenbergdev`** on Discord and mention that you would like to test LAN PC Monitor.
 
 The project is usable today, but it is pre-release software: expect rough edges and verify alerts and readings against
 your hardware before relying on them.
@@ -26,7 +34,7 @@ your hardware before relying on them.
 
 [**Download the latest Windows installer from GitHub Releases**](https://github.com/sam-schonenberg/lan-pc-monitor/releases/latest)
 
-Open the release's **Assets** section and download `LanPcMonitor-0.1.7-win-x64.msi`. Run the installer as an administrator. It installs:
+Open the release's **Assets** section and download `LanPcMonitor-0.2.0-win-x64.msi`. Run the installer as an administrator. It installs:
 
 - the background monitoring service;
 - the signed PawnIO hardware-access driver required for supported CPU and motherboard sensors;
@@ -38,8 +46,8 @@ The setup completion page opens the PC's local pairing page. Windows may show an
 
 ### 2. Install the companion app
 
-The app is not publicly listed yet. Alpha testers install **LAN PC Monitor** through the private Google Play testing
-link supplied by the maintainer.
+The app is not publicly listed, and prebuilt APK files are no longer posted on GitHub. To request access, open
+[Discord](https://discord.com/channels/@me), add **`schonenbergdev`**, and mention that you would like to test LAN PC Monitor.
 
 The Android app is only a viewer; the Windows monitor must be installed and running on the PC.
 
@@ -142,7 +150,7 @@ dotnet build .\PCMonitor.Application\PCMonitor.Application.csproj --configuratio
 Build the self-contained Windows MSI:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.7
+.\scripts\build-installer.ps1 -Version 0.2.0
 ```
 
 Release maintainers should follow the [release checklist](docs/RELEASING.md).
@@ -189,7 +197,7 @@ Most users do not need to edit these values. Phone notification enrollment happe
 - [Security and safe deployment](docs/SECURITY.md)
 - [Notification relay architecture](docs/NOTIFICATION_RELAY.md)
 - [Release checklist](docs/RELEASING.md)
-- [v0.1.7 release notes](docs/RELEASE_NOTES_0.1.7.md)
+- [v0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md)
 
 ## Contributing
 

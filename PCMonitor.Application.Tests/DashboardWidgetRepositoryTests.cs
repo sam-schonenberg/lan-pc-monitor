@@ -18,7 +18,7 @@ public sealed class DashboardWidgetRepositoryTests : IDisposable
         var graph = DashboardWidgetCatalog.Create(DashboardWidgetType.Graph, 1) with
         {
             Title = "GPU history",
-            Configuration = new GraphWidgetConfiguration("gpu-temp", TimeSpan.FromHours(6), true, false, true)
+            Configuration = new GraphWidgetConfiguration("gpu-temp", TimeSpan.FromHours(6), true, false, true, ["cpu-temp"])
         };
         var value = DashboardWidgetCatalog.Create(DashboardWidgetType.CurrentValue, 0) with
         {
@@ -32,7 +32,9 @@ public sealed class DashboardWidgetRepositoryTests : IDisposable
 
         Assert.Equal([value.Id, graph.Id], saved.Select(x => x.Id));
         Assert.Equal("gpu-temp", Assert.IsType<CurrentValueWidgetConfiguration>(saved[0].Configuration).SensorId);
-        Assert.Equal(TimeSpan.FromHours(6), Assert.IsType<GraphWidgetConfiguration>(saved[1].Configuration).EffectiveRange);
+        var savedGraph = Assert.IsType<GraphWidgetConfiguration>(saved[1].Configuration);
+        Assert.Equal(TimeSpan.FromHours(6), savedGraph.EffectiveRange);
+        Assert.Equal(["cpu-temp"], savedGraph.EffectiveComparisonSensorIds);
     }
 
     [Fact]

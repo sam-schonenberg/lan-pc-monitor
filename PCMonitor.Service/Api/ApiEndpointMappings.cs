@@ -5,6 +5,7 @@ using PCMonitor.Service.Models;
 using PCMonitor.Service.Notifications;
 using PCMonitor.Service.Services;
 using PCMonitor.Service.SessionDetection;
+using PCMonitor.Service.Diagnostics;
 
 namespace PCMonitor.Service.Api;
 
@@ -29,7 +30,7 @@ public static class ApiEndpointMappings
 
     private static ServiceStatus Status() => new("ok", "PCMonitor", Environment.MachineName,
         DateTimeOffset.UtcNow, typeof(ApiEndpointMappings).Assembly.GetName().Version?.ToString(3) ?? "0.0.0", "1",
-        ["sensors", "history", "sessions", "alerts", "custom-alert-rules", "push-notifications", "websocket"]);
+        ["sensors", "history", "sessions", "alerts", "diagnostics", "custom-alert-rules", "push-notifications", "websocket"]);
 
     private static void MapApiGroup(RouteGroupBuilder group, bool documented)
     {
@@ -104,6 +105,15 @@ public static class ApiEndpointMappings
         Describe(group.MapGet("/history", History), documented, "GetHistory", "History", "Query retained history",
             "Supports cursor paging, time bounds, resolution aggregation, sensor filtering, and session filtering.")
             .Produces<CompactHistoryResponse>().Produces<ApiError>(StatusCodes.Status400BadRequest);
+
+        Describe(group.MapGet("/diagnostics/status", (WindowsDiagnosticScanner scanner) => scanner.GetStatus()),
+            documented, "GetWindowsDiagnosticsStatus", "Diagnostics", "Get Windows diagnostic collection status",
+            "Returns configured sources, retention limits, retained inventory, and the latest scan result.")
+            .Produces<WindowsDiagnosticsStatusResponse>();
+        Describe(group.MapGet("/diagnostics/events", DiagnosticsEvents), documented,
+            "GetWindowsDiagnosticEvents", "Diagnostics", "Query retained Windows diagnostic events",
+            "Returns newest-first Error and Critical events with cursor paging and optional filters.")
+            .Produces<WindowsDiagnosticEventsResponse>().Produces<ApiError>(StatusCodes.Status400BadRequest);
     }
 
     private static RouteHandlerBuilder Describe(RouteHandlerBuilder endpoint, bool documented, string name,
@@ -188,5 +198,14 @@ public static class ApiEndpointMappings
         if (afterSequence < 0 || beforeSequence < 0 || limit <= 0)
             return Results.BadRequest(new ApiError("Cursors cannot be negative and limit must be positive."));
         return Results.Ok(history.QueryCompact(from, to, afterSequence, limit, parsed.Value, sensorId, sessionId, beforeSequence));
+    }
+
+    private static IResult DiagnosticsEvents(long? beforeSequence, int? limit,
+        WindowsDiagnosticSeverity? minimumSeverity, string? channel, string? provider, int? eventId,
+        WindowsDiagnosticStore store)
+    {
+        if (beforeSequence < 0 || limit <= 0 || eventId < 0)
+            return Results.BadRequest(new ApiError("Cursor and eventId cannot be negative and limit must be positive."));
+        return Results.Ok(store.Query(beforeSequence, limit, minimumSeverity, channel, provider, eventId));
     }
 }

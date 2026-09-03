@@ -43,6 +43,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             new ToolStripSeparator(),
             new ToolStripMenuItem("Open Monitoring API", null, (_, _) => OpenUrl("api/sensors")),
             new ToolStripMenuItem("Open Status Endpoint", null, (_, _) => OpenUrl("status")),
+            new ToolStripMenuItem("Open Windows Diagnostics", null, (_, _) => OpenUrl("diagnostics")),
             new ToolStripMenuItem("Open Setup & Pairing", null, (_, _) => OpenUrl("setup")),
             new ToolStripSeparator(),
             _testNotificationItem,

@@ -43,5 +43,14 @@ public sealed record DeviceRegistrationResponseDto(string InstallationId, string
     DateTimeOffset UpdatedAt);
 public sealed record NotificationStatusDto(bool Enabled, bool Configured, int RegisteredDevices,
     string MinimumSeverity);
+public sealed record WindowsDiagnosticEventDto(long Sequence, DateTimeOffset Timestamp, string Channel,
+    string Provider, int EventId, byte Version, byte WindowsLevel, long RecordId, string Severity,
+    string Category, int OccurrenceCount, string Title, string Summary);
+public sealed record WindowsDiagnosticEventsResponseDto(long? FromSequence, long? ToSequence, bool HasMore,
+    long? PreviousSequence, IReadOnlyList<WindowsDiagnosticEventDto> Events);
+public sealed record WindowsDiagnosticsStatusResponseDto(bool Enabled, int ScanIntervalMinutes, int RetentionDays,
+    int MaximumStorageMegabytes, IReadOnlyList<string> Channels, IReadOnlyList<string> Providers,
+    int StoredEventCount, long? OldestSequence, long? NewestSequence, DateTimeOffset? LastSuccessfulScan,
+    string? LastError);
 public sealed record SessionStatusDto(string State, JsonElement? Session);
 public sealed record LiveEventEnvelopeDto(string Type, JsonElement Data);

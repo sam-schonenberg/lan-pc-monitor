@@ -16,7 +16,7 @@ public sealed class AlertRulesPage : ContentPage
     public AlertRulesPage(MonitorApiClient api, HistoryRepository history)
     {
         _api = api; _history = history; Title = "Custom alert rules";
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
         var add = new Button { Text = "+ Add alert rule" };
         add.Clicked += async (_, _) => await OpenEditorAsync(null);
         Content = new ScrollView { Content = new VerticalStackLayout
@@ -57,7 +57,7 @@ public sealed class AlertRulesPage : ContentPage
             FontSize = 12, Opacity = .72
         };
         var state = new Label { Text = rule.Enabled ? "Enabled" : "Disabled", FontSize = 12,
-            TextColor = rule.Enabled ? Color.FromArgb("#16A34A") : Color.FromArgb("#64748B") };
+            TextColor = rule.Enabled ? Color.FromArgb("#16A34A") : Color.FromArgb("#66768A") };
         var edit = new Button { Text = "Edit", FontSize = 12 };
         edit.Clicked += async (_, _) => await OpenEditorAsync(rule);
         var delete = new Button { Text = "Delete", FontSize = 12, BackgroundColor = Color.FromArgb("#B91C1C") };
@@ -80,8 +80,8 @@ public sealed class AlertRulesPage : ContentPage
     {
         var card = new Border { Content = content, Padding = 14, StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 14 } };
-        card.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#212121"));
-        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#404040"));
+        card.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         return card;
     }
 }
@@ -107,7 +107,7 @@ public sealed class AlertRuleEditorPage : ContentPage
     public AlertRuleEditorPage(CustomAlertRuleDto? rule, MonitorApiClient api, HistoryRepository history)
     {
         _rule = rule; _api = api; _history = history; Title = rule is null ? "Add alert rule" : "Edit alert rule";
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
         if (rule is not null)
         {
             _name.Text = rule.Name; _direction.SelectedIndex = rule.Direction == "below" ? 1 : 0;

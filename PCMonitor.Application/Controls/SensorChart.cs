@@ -35,10 +35,15 @@ public sealed class SensorChart : ContentView
         typeof(string), typeof(SensorChart), string.Empty, propertyChanged: OnStatePropertyChanged);
     public static readonly BindableProperty IsCompactProperty = BindableProperty.Create(nameof(IsCompact),
         typeof(bool), typeof(SensorChart), false, propertyChanged: OnChartPropertyChanged);
+    public static readonly BindableProperty ComparisonSeriesProperty = BindableProperty.Create(nameof(ComparisonSeries),
+        typeof(IReadOnlyList<SensorGraphSeries>), typeof(SensorChart), Array.Empty<SensorGraphSeries>(),
+        propertyChanged: OnChartPropertyChanged);
 
     private readonly CartesianChart _chart;
     private readonly ActivityIndicator _loading;
     private readonly Label _empty;
+    private readonly Grid _layers;
+    private readonly FlexLayout _comparisonLegend;
 
     public SensorChart()
     {
@@ -53,11 +58,20 @@ public sealed class SensorChart : ContentView
             VerticalOptions = LayoutOptions.Center };
         _empty = new Label { Text = "No history available for this range", Opacity = 0.7,
             HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center };
-        var layers = new Grid { MinimumHeightRequest = 220, Children = { _chart, _empty, _loading } };
+        _layers = new Grid { MinimumHeightRequest = 220, Children = { _chart, _empty, _loading } };
+        _comparisonLegend = new FlexLayout
+        {
+            Direction = Microsoft.Maui.Layouts.FlexDirection.Row,
+            Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+            AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center,
+            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+            IsVisible = false
+        };
         var border = new Border { Padding = new Thickness(8, 12), StrokeShape = new RoundRectangle { CornerRadius = 14 },
-            StrokeThickness = 1, Content = layers };
-        border.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#212121"));
-        border.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#404040"));
+            StrokeThickness = 1, Content = new VerticalStackLayout
+            { Spacing = 6, Children = { _layers, _comparisonLegend } } };
+        border.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+        border.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         Content = border;
         RebuildChart(); UpdateState();
     }
@@ -73,22 +87,43 @@ public sealed class SensorChart : ContentView
     public bool IsLoading { get => (bool)GetValue(IsLoadingProperty); set => SetValue(IsLoadingProperty, value); }
     public string ErrorMessage { get => (string)GetValue(ErrorMessageProperty); set => SetValue(ErrorMessageProperty, value); }
     public bool IsCompact { get => (bool)GetValue(IsCompactProperty); set => SetValue(IsCompactProperty, value); }
+    public IReadOnlyList<SensorGraphSeries> ComparisonSeries { get =>
+        (IReadOnlyList<SensorGraphSeries>)GetValue(ComparisonSeriesProperty); set => SetValue(ComparisonSeriesProperty, value); }
 
     private void RebuildChart()
     {
         var points = Points ?? Array.Empty<SensorChartPoint>();
-        _chart.HeightRequest = IsCompact ? 170 : 220;
-        var averageColor = ThemeColor("Primary", Colors.MediumPurple);
-        var boundaryColor = ThemeColor("SecondaryText", Colors.SlateGray);
+        var comparisons = ComparisonSeries ?? Array.Empty<SensorGraphSeries>();
+        _chart.HeightRequest = IsCompact ? comparisons.Count > 1 ? 205 : 170 : 220;
+        _layers.MinimumHeightRequest = _chart.HeightRequest;
+        var darkTheme = Microsoft.Maui.Controls.Application.Current?.RequestedTheme == AppTheme.Dark;
+        var averageColor = SKColor.Parse(darkTheme ? GraphSeriesPalette.DarkAverage : GraphSeriesPalette.LightAverage);
+        var boundaryColor = SKColor.Parse(darkTheme ? GraphSeriesPalette.DarkBoundary : GraphSeriesPalette.LightBoundary);
         var series = new List<ISeries>();
         var expectedInterval = ExpectedInterval(RangeDuration);
-        if (ShowMaximum) series.Add(Line("Maximum", WithGaps(points, x => x.Maximum, expectedInterval), boundaryColor, 1, 0));
-        if (ShowAverage) series.Add(Line("Average", WithGaps(points, x => x.Average, expectedInterval), averageColor, 2.5f, 4));
-        if (ShowMinimum) series.Add(Line("Minimum", WithGaps(points, x => x.Minimum, expectedInterval), boundaryColor, 1, 0));
+        if (comparisons.Count > 0)
+        {
+            var colors = SeriesColors();
+            for (var index = 0; index < comparisons.Count; index++)
+            {
+                var item = comparisons[index];
+                series.Add(Line(item.Name, WithGaps(item.Points, x => x.Average, expectedInterval),
+                    colors[index % colors.Length], 2.5f, 0));
+            }
+            BuildComparisonLegend(comparisons, colors);
+        }
+        else
+        {
+            if (ShowMaximum) series.Add(Line("Maximum", WithGaps(points, x => x.Maximum, expectedInterval), boundaryColor, 1, 0));
+            if (ShowAverage) series.Add(Line("Average", WithGaps(points, x => x.Average, expectedInterval), averageColor, 2.5f, 0));
+            if (ShowMinimum) series.Add(Line("Minimum", WithGaps(points, x => x.Minimum, expectedInterval), boundaryColor, 1, 0));
+            _comparisonLegend.Clear();
+            _comparisonLegend.IsVisible = false;
+        }
+        _chart.LegendPosition = LiveChartsCore.Measure.LegendPosition.Hidden;
         _chart.Series = series;
 
-        var darkTheme = Microsoft.Maui.Controls.Application.Current?.RequestedTheme == AppTheme.Dark;
-        var text = darkTheme ? new SKColor(225, 225, 225) : new SKColor(64, 64, 64);
+        var text = darkTheme ? new SKColor(245, 248, 252) : new SKColor(7, 20, 38);
         var duration = RangeDuration <= TimeSpan.Zero ? TimeSpan.FromHours(24) : RangeDuration;
         var rangeEnd = RangeEnd == default ? DateTimeOffset.UtcNow : RangeEnd.ToUniversalTime();
         _chart.XAxes =
@@ -161,9 +196,11 @@ public sealed class SensorChart : ContentView
 
     private void UpdateState()
     {
+        var hasData = Points is { Count: > 0 } || ComparisonSeries is { Count: > 0 } comparisons &&
+            comparisons.Any(x => x.Points.Count > 0);
         _loading.IsVisible = IsLoading;
-        _chart.IsVisible = !IsLoading && Points is { Count: > 0 };
-        _empty.IsVisible = !IsLoading && Points is not { Count: > 0 };
+        _chart.IsVisible = !IsLoading && hasData;
+        _empty.IsVisible = !IsLoading && !hasData;
         _empty.Text = string.IsNullOrWhiteSpace(ErrorMessage) ? "No history available for this range" : ErrorMessage;
     }
 
@@ -172,6 +209,38 @@ public sealed class SensorChart : ContentView
         var value = Microsoft.Maui.Controls.Application.Current?.Resources.TryGetValue(key, out var resource) == true && resource is Color color
             ? color : fallback;
         return new SKColor((byte)(value.Red * 255), (byte)(value.Green * 255), (byte)(value.Blue * 255), 255);
+    }
+
+    private static SKColor[] SeriesColors()
+    {
+        var darkTheme = Microsoft.Maui.Controls.Application.Current?.RequestedTheme == AppTheme.Dark;
+        return (darkTheme ? GraphSeriesPalette.DarkSeries : GraphSeriesPalette.LightSeries).Select(SKColor.Parse).ToArray();
+    }
+
+    private void BuildComparisonLegend(IReadOnlyList<SensorGraphSeries> comparisons, IReadOnlyList<SKColor> colors)
+    {
+        _comparisonLegend.Clear();
+        for (var index = 0; index < comparisons.Count; index++)
+        {
+            var color = colors[index % colors.Count];
+            var marker = new BoxView
+            {
+                WidthRequest = 8, HeightRequest = 8, CornerRadius = 4,
+                Color = Color.FromRgb(color.Red, color.Green, color.Blue),
+                VerticalOptions = LayoutOptions.Center
+            };
+            var name = comparisons[index].Name;
+            if (name.EndsWith(" Temperature", StringComparison.OrdinalIgnoreCase))
+                name = name[..^" Temperature".Length];
+            var label = new Label { Text = name, FontSize = 10, MaxLines = 1,
+                LineBreakMode = LineBreakMode.TailTruncation, VerticalTextAlignment = TextAlignment.Center };
+            _comparisonLegend.Add(new HorizontalStackLayout
+            {
+                Spacing = 5, Margin = new Thickness(4, 2, 10, 2),
+                Children = { marker, label }
+            });
+        }
+        _comparisonLegend.IsVisible = comparisons.Count > 1;
     }
 
     private static void OnChartPropertyChanged(BindableObject bindable, object oldValue, object newValue) =>

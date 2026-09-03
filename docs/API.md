@@ -96,7 +96,7 @@ Recommended connectivity check. It returns service health, the Windows machine n
   "service": "PCMonitor",
   "machineName": "DESKTOP-PC",
   "timestamp": "2026-08-16T10:20:30+00:00",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "apiVersion": "1",
   "capabilities": ["sensors", "history", "sessions", "alerts", "push-notifications", "websocket"]
 }
@@ -478,3 +478,14 @@ WS  /api/v1/ws/sensors
 ```
 
 Use HTTP for durable synchronization and WebSocket for transient live state.
+
+## Windows diagnostics
+
+`GET /api/v1/diagnostics/status` reports whether collection is enabled, its interval and storage limits,
+the configured channels/providers, retained sequence bounds, and the last scan result.
+
+`GET /api/v1/diagnostics/events` returns retained Error and Critical Windows events newest first. Supported
+query parameters are `beforeSequence`, `limit`, `minimumSeverity`, `channel`, `provider`, and `eventId`.
+Use the last event's sequence as `beforeSequence` to retrieve the next page. Each record includes a stable,
+plain-language `title` and `summary` generated from its provider and Event ID, as well as its normalized category
+and technical identity. The service deliberately avoids localized rendered messages and raw event XML.

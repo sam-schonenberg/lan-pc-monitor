@@ -220,9 +220,13 @@ public partial class GraphWidgetViewModel(DashboardWidgetDefinition definition, 
     public override string Title => WidgetTitle.Resolve(Definition, sensor);
     public string RangeLabel => WidgetTitle.Range(Config.EffectiveRange);
     public string? Unit => sensor?.Unit;
+    public string? SensorType => sensor?.SensorType;
+    public string? SensorId => Config.SensorId;
+    public IReadOnlyList<string> ComparisonSensorIds => Config.EffectiveComparisonSensorIds;
     public TimeSpan Range => Config.EffectiveRange;
     public bool ShowAverage => Config.ShowAverage; public bool ShowMinimum => Config.ShowMinimum; public bool ShowMaximum => Config.ShowMaximum;
     [ObservableProperty] public partial IReadOnlyList<SensorChartPoint> Points { get; set; } = [];
+    [ObservableProperty] public partial IReadOnlyList<SensorGraphSeries> ComparisonSeries { get; set; } = [];
     [ObservableProperty] public partial string CurrentValue { get; set; } = "—";
     [ObservableProperty] public partial string Freshness { get; set; } = "No recorded value";
     [ObservableProperty] public partial DateTimeOffset RangeEnd { get; set; } = DateTimeOffset.UtcNow;
@@ -235,6 +239,20 @@ public partial class GraphWidgetViewModel(DashboardWidgetDefinition definition, 
             RangeEnd = timeProvider.GetUtcNow();
             var resolution = Range > TimeSpan.FromDays(30) ? SensorChartResolution.Day : Range > TimeSpan.FromDays(1) ? SensorChartResolution.Hour : SensorChartResolution.Minute;
             Points = await history.GetChartDataAsync(Config.SensorId, RangeEnd - Range, RangeEnd, resolution);
+            var sensorOptions = (await history.GetSensorOptionsAsync()).ToDictionary(x => x.SensorId, StringComparer.Ordinal);
+            var series = new List<SensorGraphSeries>
+            {
+                new(Config.SensorId, SensorDisplayText.PickerLabel(sensor?.Hardware ?? string.Empty,
+                    sensor?.SensorName ?? Title, sensor?.SensorType ?? string.Empty, sensor?.Unit), Unit, Points)
+            };
+            foreach (var id in Config.EffectiveComparisonSensorIds.Distinct(StringComparer.Ordinal))
+            {
+                if (!sensorOptions.TryGetValue(id, out var option) ||
+                    !GraphCompatibility.AreCompatible(sensor?.SensorType, sensor?.Unit, option.SensorType, option.Unit)) continue;
+                series.Add(new(id, SensorDisplayText.PickerLabel(option.Hardware, option.SensorName, option.SensorType, option.Unit),
+                    option.Unit, await history.GetChartDataAsync(id, RangeEnd - Range, RangeEnd, resolution)));
+            }
+            ComparisonSeries = series.Count > 1 ? series : [];
             if (currentState.TryGet(Config.SensorId, out var live) && live?.Value is not null) ApplyLive(live);
             else
             {

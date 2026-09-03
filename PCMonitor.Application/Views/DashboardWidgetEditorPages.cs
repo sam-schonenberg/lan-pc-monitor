@@ -8,17 +8,20 @@ public sealed class AddDashboardWidgetPage : ContentPage
     public AddDashboardWidgetPage(Func<DashboardWidgetType, Page> editorFactory)
     {
         Title = "Add widget";
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
         var content = new VerticalStackLayout { Padding = 18, Spacing = 12,
             Children = { new Label { Text = "Choose a widget", FontSize = 24, FontAttributes = FontAttributes.Bold } } };
         foreach (var descriptor in DashboardWidgetCatalog.Available)
         {
             var button = new Button { Text = descriptor.DisplayName, HorizontalOptions = LayoutOptions.Fill };
             button.Clicked += async (_, _) => await Navigation.PushAsync(editorFactory(descriptor.Type));
-            content.Add(new Border { Padding = 14, Content = new VerticalStackLayout { Spacing = 7, Children =
+            var card = new Border { Padding = 14, Content = new VerticalStackLayout { Spacing = 7, Children =
             {
                 button, new Label { Text = descriptor.Description, FontSize = 12, Opacity = 0.72 }
-            }}});
+            }}};
+            card.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+            card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
+            content.Add(card);
         }
         Content = new ScrollView { Content = content };
     }
@@ -50,7 +53,7 @@ public sealed class DashboardWidgetEditorPage : ContentPage
     {
         _definition = definition; _repository = repository; _history = history; _completed = completed;
         Title = isNew ? $"Add {TypeName(definition.Type)}" : $"Edit {TypeName(definition.Type)}";
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
         _title.Text = definition.Title;
         _width.SelectedItem = definition.Width;
         _enabled.IsToggled = definition.IsEnabled;
@@ -117,7 +120,8 @@ public sealed class DashboardWidgetEditorPage : ContentPage
                     _precision.SelectedItem is int precision ? precision : 1, _showMinMax.IsToggled),
                 DashboardWidgetType.Graph => new GraphWidgetConfiguration(sensorId,
                     (_range.SelectedItem as WidgetRangeOption)?.Range ?? TimeSpan.FromHours(1),
-                    _showAverage.IsToggled, _showMinimum.IsToggled, _showMaximum.IsToggled),
+                    _showAverage.IsToggled, _showMinimum.IsToggled, _showMaximum.IsToggled,
+                    (_definition.Configuration as GraphWidgetConfiguration)?.ComparisonSensorIds),
                 DashboardWidgetType.Alerts => new AlertWidgetConfiguration(sensorId,
                     _severity.SelectedIndex <= 0 ? null : _severity.SelectedItem?.ToString(),
                     int.TryParse(_itemLimit.Text, out var limit) ? limit : 5),

@@ -54,8 +54,7 @@ internal sealed class SyncProgressPage : ContentPage
 {
     private readonly Label _message = new() { Text = "Getting the latest history…", FontSize = 14,
         HorizontalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.WordWrap };
-    private readonly ProgressBar _progress = new() { Progress = 0.03, HeightRequest = 6,
-        ProgressColor = Color.FromArgb("#512BD4") };
+    private readonly ProgressBar _progress = new() { Progress = 0.03, HeightRequest = 6 };
 
     public SyncProgressPage()
     {
@@ -71,8 +70,8 @@ internal sealed class SyncProgressPage : ContentPage
                     HorizontalTextAlignment = TextAlignment.Center }, _message, _progress
             }}
         };
-        card.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#242424"));
-        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#484848"));
+        card.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#DCE8F2"), Color.FromArgb("#10243A"));
+        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         Content = card;
     }
 

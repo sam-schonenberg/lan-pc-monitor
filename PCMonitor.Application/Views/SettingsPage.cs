@@ -10,7 +10,7 @@ public sealed class SettingsPage : ContentPage
     public SettingsPage(SettingsViewModel viewModel, IServiceProvider services)
     {
         Title = "Settings"; BindingContext = _viewModel = viewModel;
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
 
         var sensors = new CollectionView
         {
@@ -21,7 +21,7 @@ public sealed class SettingsPage : ContentPage
                 HorizontalTextAlignment = TextAlignment.Center, Opacity = 0.7 },
             ItemTemplate = new DataTemplate(CreateSensorRow)
         };
-        sensors.SetBinding(ItemsView.ItemsSourceProperty, nameof(viewModel.Sensors));
+        sensors.SetBinding(ItemsView.ItemsSourceProperty, nameof(viewModel.FilteredSensors));
         Content = sensors;
         viewModel.ChangeRequested += (_, _) => Microsoft.Maui.Controls.Application.Current!.Windows[0].Page =
             services.GetRequiredService<SetupPage>();
@@ -40,13 +40,29 @@ public sealed class SettingsPage : ContentPage
         lastSync.SetBinding(Label.TextProperty, nameof(_viewModel.LastSynchronization));
         var syncStatus = new Label { FontSize = 12, Opacity = 0.75, LineBreakMode = LineBreakMode.WordWrap };
         syncStatus.SetBinding(Label.TextProperty, nameof(_viewModel.SynchronizationStatus));
-        var syncProgress = new ProgressBar { HeightRequest = 6, ProgressColor = Color.FromArgb("#512BD4") };
+        var syncProgress = new ProgressBar { HeightRequest = 6 };
         syncProgress.SetBinding(ProgressBar.ProgressProperty, nameof(_viewModel.SynchronizationProgress));
         var synchronize = new Button { Text = "Synchronize now" };
         synchronize.SetBinding(Button.CommandProperty, nameof(_viewModel.SynchronizeCommand));
         synchronize.SetBinding(IsEnabledProperty, nameof(_viewModel.IsSynchronizing), converter: new InvertedBoolConverter());
         var loading = new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Start };
         loading.SetBinding(IsVisibleProperty, nameof(_viewModel.IsLoadingSensors));
+        var sensorSearch = new SearchBar { Placeholder = "Search sensors", Margin = new Thickness(-8, 0) };
+        sensorSearch.SetBinding(SearchBar.TextProperty, nameof(_viewModel.SensorSearchText), mode: BindingMode.TwoWay);
+        var hideAll = new Button { HorizontalOptions = LayoutOptions.End };
+        hideAll.SetBinding(Button.TextProperty, nameof(_viewModel.SensorVisibilityButtonText));
+        hideAll.SetBinding(IsEnabledProperty, nameof(_viewModel.IsUpdatingSensorVisibility),
+            converter: new InvertedBoolConverter());
+        hideAll.Clicked += async (_, _) =>
+        {
+            var unhide = _viewModel.AreAllSensorsHidden;
+            if (!await DisplayAlertAsync(unhide ? "Unhide all sensors?" : "Turn all sensors off?",
+                    unhide
+                        ? "This restores every sensor to app pickers."
+                        : "This hides every sensor from app pickers. Sensor recording and synchronization will continue.",
+                    unhide ? "Unhide all" : "Turn all off", "Cancel")) return;
+            await _viewModel.ToggleAllSensorVisibilityAsync();
+        };
         var notificationStatus = new Label { FontSize = 12, Opacity = 0.75, LineBreakMode = LineBreakMode.WordWrap };
         notificationStatus.SetBinding(Label.TextProperty, nameof(_viewModel.NotificationStatus));
         var notificationButton = new Button();
@@ -71,6 +87,7 @@ public sealed class SettingsPage : ContentPage
                     new Label { Text = "The latest history is also synchronized automatically whenever the app becomes active.",
                         FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap }
                 }}),
+                CreateExportCard(),
                 Card(new VerticalStackLayout { Spacing = 9, Children =
                 {
                     new Label { Text = "Critical notifications", FontSize = 18, FontAttributes = FontAttributes.Bold },
@@ -81,9 +98,44 @@ public sealed class SettingsPage : ContentPage
                 new Label { Text = "Visible sensors", FontSize = 20, FontAttributes = FontAttributes.Bold,
                     Margin = new Thickness(0, 8, 0, 0) },
                 new Label { Text = "Hidden sensors are removed from app pickers only. All sensors continue to be recorded and synchronized.",
-                    FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap }, loading
+                    FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap },
+                sensorSearch, hideAll, loading
             }
         };
+    }
+
+    private View CreateExportCard()
+    {
+        var status = new Label { FontSize = 12, Opacity = 0.75, LineBreakMode = LineBreakMode.WordWrap };
+        status.SetBinding(Label.TextProperty, nameof(_viewModel.ExportStatus));
+        var export = new Button { Text = "Export sensor history" };
+        export.SetBinding(IsEnabledProperty, nameof(_viewModel.IsExporting), converter: new InvertedBoolConverter());
+        export.Clicked += async (_, _) =>
+        {
+            var choice = await DisplayActionSheetAsync("Export all sensors", "Cancel", null,
+                "Last hour", "Last 6 hours", "Last 24 hours");
+            var hours = choice switch { "Last hour" => 1, "Last 6 hours" => 6, "Last 24 hours" => 24, _ => 0 };
+            if (hours > 0) await _viewModel.ExportAsync(hours);
+        };
+        var latestText = new Label { FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
+        latestText.SetBinding(Label.TextProperty, nameof(_viewModel.LatestExportSummary));
+        var latest = new Border
+        {
+            Content = latestText, Padding = 12, StrokeShape = new RoundRectangle { CornerRadius = 10 }, StrokeThickness = 1
+        };
+        latest.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#DCE8F2"), Color.FromArgb("#10243A"));
+        latest.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
+        latest.SetBinding(IsVisibleProperty, nameof(_viewModel.HasLatestExport));
+        var tap = new TapGestureRecognizer();
+        tap.SetBinding(TapGestureRecognizer.CommandProperty, nameof(_viewModel.ShareLatestExportCommand));
+        latest.GestureRecognizers.Add(tap);
+        return Card(new VerticalStackLayout { Spacing = 9, Children =
+        {
+            new Label { Text = "Share sensor data", FontSize = 18, FontAttributes = FontAttributes.Bold },
+            status, export, latest,
+            new Label { Text = "Includes timestamps, sensor details, units, minimum, average and maximum values. CSV is compact and ready to attach to an LLM conversation.",
+                FontSize = 12, Opacity = 0.72, LineBreakMode = LineBreakMode.WordWrap }
+        }});
     }
 
     private static View CreateSensorRow()
@@ -107,8 +159,8 @@ public sealed class SettingsPage : ContentPage
     {
         var card = new Border { Content = content, Padding = 14, Margin = margin ?? Thickness.Zero,
             StrokeShape = new RoundRectangle { CornerRadius = 14 }, StrokeThickness = 1 };
-        card.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#212121"));
-        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#404040"));
+        card.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         return card;
     }
 }

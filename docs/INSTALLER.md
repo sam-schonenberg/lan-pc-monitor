@@ -58,7 +58,7 @@ This conservative behavior prevents upgrades or accidental uninstallations from 
 From the repository root:
 
 ```powershell
-.\scripts\build-installer.ps1 -Version 0.1.7
+.\scripts\build-installer.ps1 -Version 0.2.0
 ```
 
 The script:
@@ -71,8 +71,8 @@ The script:
 Outputs:
 
 ```text
-artifacts\installer\LanPcMonitor-0.1.7-win-x64.msi
-artifacts\installer\LanPcMonitor-0.1.7-win-x64.msi.sha256
+artifacts\installer\LanPcMonitor-0.2.0-win-x64.msi
+artifacts\installer\LanPcMonitor-0.2.0-win-x64.msi.sha256
 ```
 
 MSI versions must use three numeric parts. Build each public version from a clean tagged commit.

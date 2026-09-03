@@ -13,7 +13,7 @@ public sealed class AlertsPage : ContentPage
     {
         _services = services;
         Title = "Alerts"; BindingContext = _viewModel = viewModel;
-        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F4F7FB"), Color.FromArgb("#141414"));
+        this.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#F5F8FC"), Color.FromArgb("#071426"));
         var list = new CollectionView
         {
             Margin = new Thickness(18, 0),
@@ -60,8 +60,9 @@ public sealed class AlertsPage : ContentPage
         var healthGrid = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) },
             ColumnSpacing = 12, Children = { healthDot, healthText } };
         healthGrid.SetColumn(healthText, 1);
-        var bell = new Label { Text = "●", TextColor = Color.FromArgb("#512BD4"), FontSize = 15,
+        var bell = new Label { Text = "●", FontSize = 15,
             VerticalTextAlignment = TextAlignment.Center };
+        bell.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb("#007F94"), Color.FromArgb("#00D8F0"));
         var notificationGrid = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) },
             ColumnSpacing = 9, Children = { bell, notification } };
         notificationGrid.SetColumn(notification, 1);
@@ -70,6 +71,7 @@ public sealed class AlertsPage : ContentPage
         var manageRules = new Button { Text = "Manage custom alert rules", HorizontalOptions = LayoutOptions.Fill };
         manageRules.Clicked += async (_, _) => await Navigation.PushAsync(
             _services.GetRequiredService<AlertRulesPage>());
+        var diagnostics = CreateDiagnosticsCard();
         return new VerticalStackLayout
         {
             Spacing = 12, Padding = new Thickness(0, 18, 0, 12),
@@ -77,6 +79,7 @@ public sealed class AlertsPage : ContentPage
             {
                 new Label { Text = "ALERTS", FontSize = 25, FontAttributes = FontAttributes.Bold },
                 Card(healthGrid),
+                diagnostics,
                 Card(new VerticalStackLayout { Spacing = 5, Children = { notificationGrid, update } }),
                 manageRules,
                 new Label { Text = "Live alert status", FontSize = 20, FontAttributes = FontAttributes.Bold,
@@ -87,6 +90,38 @@ public sealed class AlertsPage : ContentPage
         };
     }
 
+    private View CreateDiagnosticsCard()
+    {
+        var dot = new Border { WidthRequest = 12, HeightRequest = 12, StrokeThickness = 0,
+            StrokeShape = new RoundRectangle { CornerRadius = 6 }, VerticalOptions = LayoutOptions.Start,
+            Margin = new Thickness(0, 5, 0, 0) };
+        dot.SetBinding(BackgroundColorProperty, nameof(_viewModel.LatestDiagnosticColor));
+        var heading = new Label { Text = "WINDOWS DIAGNOSTICS", FontSize = 11, FontAttributes = FontAttributes.Bold,
+            CharacterSpacing = .6, Opacity = .7 };
+        var title = new Label { FontSize = 17, FontAttributes = FontAttributes.Bold };
+        title.SetBinding(Label.TextProperty, nameof(_viewModel.LatestDiagnosticTitle));
+        var summary = new Label { FontSize = 12, Opacity = .78, MaxLines = 2,
+            LineBreakMode = LineBreakMode.TailTruncation };
+        summary.SetBinding(Label.TextProperty, nameof(_viewModel.LatestDiagnosticSummary));
+        var metadata = new Label { FontSize = 11, Opacity = .58, MaxLines = 1,
+            LineBreakMode = LineBreakMode.TailTruncation };
+        metadata.SetBinding(Label.TextProperty, nameof(_viewModel.LatestDiagnosticMetadata));
+        var chevron = new Label { Text = "View history  ›", FontSize = 12, FontAttributes = FontAttributes.Bold,
+            HorizontalOptions = LayoutOptions.End };
+        chevron.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb("#007F94"), Color.FromArgb("#00D8F0"));
+        var text = new VerticalStackLayout { Spacing = 4, Children = { heading, title, summary, metadata, chevron } };
+        var content = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) },
+            ColumnSpacing = 12, Children = { dot, text } };
+        content.SetColumn(text, 1);
+        var card = Card(content);
+        card.SetBinding(IsVisibleProperty, nameof(_viewModel.HasDiagnosticsCapability));
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (_, _) => await Navigation.PushAsync(
+            _services.GetRequiredService<WindowsDiagnosticsPage>());
+        card.GestureRecognizers.Add(tap);
+        return card;
+    }
+
     private Button FilterButton(string text, string value)
     {
         var button = new Button { Text = text, FontSize = 12, Padding = new Thickness(14, 7),
@@ -94,6 +129,8 @@ public sealed class AlertsPage : ContentPage
         button.SetBinding(Button.CommandProperty, nameof(_viewModel.SetSeverityCommand));
         button.SetBinding(Button.BackgroundColorProperty, new Binding(nameof(_viewModel.SelectedSeverity),
             converter: new SelectedFilterColorConverter(), converterParameter: value));
+        button.SetBinding(Button.TextColorProperty, new Binding(nameof(_viewModel.SelectedSeverity),
+            converter: new SelectedFilterTextColorConverter(), converterParameter: value));
         return button;
     }
 
@@ -146,8 +183,8 @@ public sealed class AlertsPage : ContentPage
     {
         var card = new Border { Content = content, Padding = 14, Margin = margin ?? Thickness.Zero,
             StrokeShape = new RoundRectangle { CornerRadius = 14 }, StrokeThickness = 1 };
-        card.SetAppThemeColor(BackgroundColorProperty, Colors.White, Color.FromArgb("#212121"));
-        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#D8DEE9"), Color.FromArgb("#404040"));
+        card.SetAppThemeColor(BackgroundColorProperty, Color.FromArgb("#EAF1F7"), Color.FromArgb("#0B1A2C"));
+        card.SetAppThemeColor(Border.StrokeProperty, Color.FromArgb("#C4D2DF"), Color.FromArgb("#1D3248"));
         return card;
     }
 }
@@ -165,7 +202,23 @@ internal sealed class SelectedFilterColorConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
         string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.OrdinalIgnoreCase)
-            ? Color.FromArgb("#512BD4") : Color.FromArgb("#64748B");
+            ? FilterTheme.Color("#DCE8F2", "#10243A") : FilterTheme.Color("#EAF1F7", "#0B1A2C");
     public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
         throw new NotSupportedException();
+}
+
+internal sealed class SelectedFilterTextColorConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.OrdinalIgnoreCase)
+            ? FilterTheme.Color("#007F94", "#00D8F0") : FilterTheme.Color("#52657A", "#AAB7C8");
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+internal static class FilterTheme
+{
+    public static Color Color(string light, string dark) =>
+        Microsoft.Maui.Graphics.Color.FromArgb(
+            Microsoft.Maui.Controls.Application.Current?.RequestedTheme == AppTheme.Dark ? dark : light);
 }

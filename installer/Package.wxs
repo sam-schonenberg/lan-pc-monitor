@@ -83,6 +83,13 @@
               Condition="NOT REMOVE~=&quot;ALL&quot;" />
     </InstallExecuteSequence>
     <UI>
+      <!-- Keep progress text useful even when Windows Installer does not supply optional ActionData fields. -->
+      <ProgressText Action="InstallFiles" Message="Copying LAN PC Monitor service and tray files." />
+      <ProgressText Action="InstallServices" Message="Registering the LAN PC Monitor Windows service." />
+      <ProgressText Action="StartServices" Message="Starting the LAN PC Monitor Windows service." />
+      <ProgressText Action="StopServices" Message="Stopping the existing LAN PC Monitor Windows service." />
+      <ProgressText Action="RemoveFiles" Message="Removing files from the previous version." />
+      <ProgressText Action="RemoveExistingProducts" Message="Finishing the upgrade from the previous version." />
       <Dialog Id="UpgradeInfoDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Title" Type="Text" X="25" Y="20" Width="320" Height="30"
                  Transparent="yes" NoPrefix="yes" Text="Update [ProductName]" />

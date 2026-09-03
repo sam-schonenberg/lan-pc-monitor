@@ -11,6 +11,7 @@ using PCMonitor.Application.Services;
 using ZXing.Net.Maui.Controls;
 using Microsoft.Maui.LifecycleEvents;
 using PCMonitor.Application.Services.Notifications;
+using PCMonitor.Application.Services.Export;
 #if ANDROID && FIREBASE_CONFIGURED
 using Plugin.Firebase.Core.Platforms.Android;
 #elif IOS && FIREBASE_CONFIGURED
@@ -46,6 +47,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAppSettingsService, AppSettingsService>();
         builder.Services.AddSingleton<AlertRepository>();
         builder.Services.AddSingleton<HistoryRepository>();
+        builder.Services.AddSingleton<HistoryExportService>();
+        builder.Services.AddSingleton<GraphImageExportService>();
         builder.Services.AddSingleton<DashboardWidgetRepository>();
         builder.Services.AddSingleton<MonitorApiClient>();
         builder.Services.AddSingleton<MonitorWebSocketClient>();
@@ -67,11 +70,13 @@ public static class MauiProgram
         builder.Services.AddTransient<DashboardViewModel>();
         builder.Services.AddTransient<HistoryViewModel>();
         builder.Services.AddTransient<AlertsViewModel>();
+        builder.Services.AddTransient<WindowsDiagnosticsViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<SetupPage>();
         builder.Services.AddTransient<DashboardPage>();
         builder.Services.AddTransient<HistoryPage>();
         builder.Services.AddTransient<AlertsPage>();
+        builder.Services.AddTransient<WindowsDiagnosticsPage>();
         builder.Services.AddTransient<AlertRulesPage>();
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<AppShell>();

@@ -17,9 +17,11 @@ public sealed record GraphWidgetConfiguration(
     TimeSpan? Range = null,
     bool ShowAverage = true,
     bool ShowMinimum = true,
-    bool ShowMaximum = true) : IDashboardWidgetConfiguration
+    bool ShowMaximum = true,
+    IReadOnlyList<string>? ComparisonSensorIds = null) : IDashboardWidgetConfiguration
 {
     public TimeSpan EffectiveRange => Range ?? TimeSpan.FromHours(1);
+    public IReadOnlyList<string> EffectiveComparisonSensorIds => ComparisonSensorIds ?? Array.Empty<string>();
 }
 
 public sealed record AlertWidgetConfiguration(

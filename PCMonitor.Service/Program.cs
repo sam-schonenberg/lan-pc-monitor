@@ -9,6 +9,7 @@ using PCMonitor.Service.History;
 using PCMonitor.Service.Alerts;
 using PCMonitor.Service.Notifications;
 using PCMonitor.Service.Api;
+using PCMonitor.Service.Diagnostics;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
@@ -29,6 +30,7 @@ builder.Services.Configure<HistoricalMonitoringOptions>(builder.Configuration.Ge
 builder.Services.Configure<ProcessMonitoringOptions>(builder.Configuration.GetSection(ProcessMonitoringOptions.SectionName));
 builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
+builder.Services.Configure<WindowsDiagnosticsOptions>(builder.Configuration.GetSection(WindowsDiagnosticsOptions.SectionName));
 builder.Services.PostConfigure<NotificationOptions>(options =>
 {
     // v0.1.2 and earlier preserved a direct-Firebase configuration without RelayBaseUrl.
@@ -62,6 +64,7 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = Compre
 builder.Services.AddSingleton<ISensorProvider, LibreHardwareMonitorSensorProvider>();
 builder.Services.AddSingleton<SensorSnapshotStore>();
 builder.Services.AddSingleton<SetupPageService>();
+builder.Services.AddSingleton<DiagnosticsPageService>();
 builder.Services.AddSingleton<LoadSensorSelector>();
 builder.Services.AddSingleton<SessionRuntimeContext>();
 builder.Services.AddSingleton<LoadSessionDetector>();
@@ -75,10 +78,14 @@ builder.Services.AddSingleton<AlertEvaluator>();
 builder.Services.AddSingleton<DeviceRegistrationStore>();
 builder.Services.AddHttpClient<IPushNotificationProvider, NotificationRelayPushProvider>();
 builder.Services.AddSingleton<NotificationDispatcher>();
+builder.Services.AddSingleton<WindowsDiagnosticStore>();
+builder.Services.AddSingleton<IWindowsEventSource, WindowsEventLogSource>();
+builder.Services.AddSingleton<WindowsDiagnosticScanner>();
 builder.Services.AddSingleton<INotificationDispatcher>(serviceProvider =>
     serviceProvider.GetRequiredService<NotificationDispatcher>());
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<NotificationDispatcher>());
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<HistoricalHistoryStore>());
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<WindowsDiagnosticScanner>());
 builder.Services.AddHostedService<ProcessMonitoringService>();
 builder.Services.AddHostedService<SensorMonitoringService>();
 
@@ -99,6 +106,9 @@ app.MapGet("/setup", (SetupPageService setupPage) => Results.Content(
 app.MapGet("/setup/qr.svg", (SetupPageService setupPage) => Results.Content(
     setupPage.CreateQrSvg(),
     "image/svg+xml; charset=utf-8")).ExcludeFromDescription();
+
+app.MapGet("/diagnostics", (DiagnosticsPageService diagnosticsPage) => Results.Content(
+    diagnosticsPage.CreateHtml(), "text/html; charset=utf-8")).ExcludeFromDescription();
 
 var sensorWebSocketHandler = async (HttpContext context, SensorSnapshotStore snapshots, LiveEventHub events,
     ILoggerFactory loggerFactory) =>

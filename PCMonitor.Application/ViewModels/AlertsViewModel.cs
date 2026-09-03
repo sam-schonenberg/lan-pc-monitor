@@ -29,8 +29,14 @@ public partial class AlertsViewModel : ObservableObject
     [ObservableProperty] public partial bool IsRefreshing { get; set; }
     [ObservableProperty] public partial string OverallStatus { get; set; } = "Checking sensors";
     [ObservableProperty] public partial string SummaryText { get; set; } = string.Empty;
-    [ObservableProperty] public partial Color OverallStatusColor { get; set; } = Color.FromArgb("#64748B");
+    [ObservableProperty] public partial Color OverallStatusColor { get; set; } = Color.FromArgb("#66768A");
     [ObservableProperty] public partial string SelectedSeverity { get; set; } = "all";
+    [ObservableProperty] public partial bool HasDiagnosticsCapability { get; set; }
+    [ObservableProperty] public partial string LatestDiagnosticTitle { get; set; } = "No system errors detected";
+    [ObservableProperty] public partial string LatestDiagnosticSummary { get; set; } =
+        "No Critical or Error events are currently retained.";
+    [ObservableProperty] public partial string LatestDiagnosticMetadata { get; set; } = string.Empty;
+    [ObservableProperty] public partial Color LatestDiagnosticColor { get; set; } = Color.FromArgb("#16A34A");
 
     public AlertsViewModel(AlertSyncService sync, AlertRepository repository, MonitorApiClient api,
         IAppSettingsService settings, CurrentSensorStateService sensors)
@@ -61,6 +67,13 @@ public partial class AlertsViewModel : ObservableObject
         catch (Exception exception) { offline = exception.Message; }
         try
         {
+            var service = await _api.GetStatusAsync();
+            HasDiagnosticsCapability = service.Capabilities?.Contains("diagnostics", StringComparer.OrdinalIgnoreCase) == true;
+            if (HasDiagnosticsCapability) await LoadLatestDiagnosticAsync();
+        }
+        catch (Exception exception) { offline ??= exception.Message; }
+        try
+        {
             var live = await _api.GetAlertStatusAsync();
             Metrics.Clear();
             foreach (var metric in live.Sensors.OrderByDescending(RiskRank).ThenBy(x => x.Category).ThenBy(x => x.SensorName))
@@ -84,6 +97,35 @@ public partial class AlertsViewModel : ObservableObject
         IsRefreshing = false; _loading = false;
     }
 
+    private async Task LoadLatestDiagnosticAsync()
+    {
+        try
+        {
+            var response = await _api.GetWindowsDiagnosticEventsAsync(null, 1);
+            var latest = response.Events.FirstOrDefault();
+            if (latest is null)
+            {
+                LatestDiagnosticTitle = "No system errors detected";
+                LatestDiagnosticSummary = "No Critical or Error events are currently retained.";
+                LatestDiagnosticMetadata = "Windows diagnostics";
+                LatestDiagnosticColor = Color.FromArgb("#16A34A");
+                return;
+            }
+            LatestDiagnosticTitle = latest.Title;
+            LatestDiagnosticSummary = latest.Summary;
+            LatestDiagnosticMetadata = $"{latest.Provider} · Event {latest.EventId} · {latest.Timestamp.ToLocalTime():g}";
+            LatestDiagnosticColor = latest.Severity.Equals("critical", StringComparison.OrdinalIgnoreCase)
+                ? Color.FromArgb("#DC2626") : Color.FromArgb("#F59E0B");
+        }
+        catch
+        {
+            LatestDiagnosticTitle = "Diagnostics unavailable";
+            LatestDiagnosticSummary = "Connect to the PC to check Windows events.";
+            LatestDiagnosticMetadata = string.Empty;
+            LatestDiagnosticColor = Color.FromArgb("#66768A");
+        }
+    }
+
     [RelayCommand]
     private void SetSeverity(string severity)
     { SelectedSeverity = severity.ToLowerInvariant(); ApplyFilter(); }
@@ -103,7 +145,7 @@ public partial class AlertsViewModel : ObservableObject
         if (critical > 0) { OverallStatus = "Critical attention needed"; OverallStatusColor = Color.FromArgb("#DC2626"); }
         else if (warning > 0) { OverallStatus = "Approaching a limit"; OverallStatusColor = Color.FromArgb("#F59E0B"); }
         else if (Metrics.Count > 0) { OverallStatus = "All monitored values are healthy"; OverallStatusColor = Color.FromArgb("#16A34A"); }
-        else { OverallStatus = "Live status unavailable"; OverallStatusColor = Color.FromArgb("#64748B"); }
+        else { OverallStatus = "Live status unavailable"; OverallStatusColor = Color.FromArgb("#66768A"); }
         SummaryText = Metrics.Count == 0 ? "Connect to your PC to load its alert rules."
             : $"{Metrics.Count} monitored {Pluralize(Metrics.Count, "value", "values")} · {critical} critical · {warning} warning";
     }

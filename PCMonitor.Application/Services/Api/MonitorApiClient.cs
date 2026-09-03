@@ -52,6 +52,18 @@ public sealed class MonitorApiClient(IAppSettingsService settings)
         await SendAsync<object>(HttpMethod.Delete, $"api/v1/alert-rules/{id}", null, token, allowEmpty: true);
     public async Task<NotificationStatusDto> GetNotificationStatusAsync(CancellationToken token = default) =>
         await GetAsync<NotificationStatusDto>("api/v1/notifications/status", null, token);
+    public async Task<WindowsDiagnosticsStatusResponseDto> GetWindowsDiagnosticsStatusAsync(
+        CancellationToken token = default) =>
+        await GetAsync<WindowsDiagnosticsStatusResponseDto>("api/v1/diagnostics/status", null, token);
+    public async Task<WindowsDiagnosticEventsResponseDto> GetWindowsDiagnosticEventsAsync(long? beforeSequence,
+        int limit = 50, string? minimumSeverity = null, CancellationToken token = default)
+    {
+        var path = $"api/v1/diagnostics/events?limit={Math.Clamp(limit, 1, 500)}" +
+                   (beforeSequence is null ? string.Empty : $"&beforeSequence={beforeSequence}") +
+                   (string.IsNullOrWhiteSpace(minimumSeverity) ? string.Empty :
+                       $"&minimumSeverity={Uri.EscapeDataString(minimumSeverity)}");
+        return await GetAsync<WindowsDiagnosticEventsResponseDto>(path, null, token);
+    }
     public async Task<DeviceRegistrationResponseDto> RegisterNotificationDeviceAsync(
         DeviceRegistrationRequestDto registration, CancellationToken token = default) =>
         await SendAsync<DeviceRegistrationResponseDto>(HttpMethod.Post, "api/v1/notifications/devices", registration, token);
