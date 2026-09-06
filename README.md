@@ -3,7 +3,7 @@
 
   <h1>LAN PC Monitor</h1>
 
-  **Monitor your Windows PC from your phone — live, local, and without relying on a cloud monitoring service.**
+  **Monitor your Windows PC from your Android phone over your local network, without a cloud monitoring service.**
 
   View hardware sensors, history, alerts, diagnostics, and load sessions from an Android device on the same network.
 
@@ -42,65 +42,63 @@
   <strong>Session tracking</strong>
 </p>
 
-LAN PC Monitor consists of a lightweight Windows monitoring service and a companion Android app.
+LAN PC Monitor consists of a Windows monitoring service and a companion Android app.
 
-The Windows service reads supported hardware sensors and keeps monitoring data locally. The Android app connects directly to the PC over your local network, giving you a convenient way to check what your system is doing without sitting in front of it.
+The Windows service reads supported hardware sensors and stores monitoring data locally. The Android app connects directly to the PC over your local network so you can check readings from your phone.
 
-Whether you're watching temperatures while gaming, investigating a crash, comparing historical sensor data, or checking whether something unusual happened while you were away, LAN PC Monitor is designed to make that information easy to access.
+Use it to watch temperatures while gaming, investigate a crash, compare sensor history, or check for unusual activity while you were away.
 
 ## What you can do
 
-### 📊 Monitor your PC live
+### Live monitoring
 
 See current CPU, GPU, memory, temperatures, clocks, fans, power usage, and other supported sensors from your Android device.
 
-The dashboard can be customized so you only see the sensors you actually care about.
+Choose which sensors appear on the dashboard.
 
 <p align="center">
   <img src="assets/screenshots/sensor-visibility-settings.jpg" width="46%" alt="Sensor visibility settings">
 </p>
 
-### 📈 Look back at what happened
+### Sensor history
 
-LAN PC Monitor stores recent sensor history locally, letting you inspect how temperatures, utilization, memory usage, and other values changed over time.
+LAN PC Monitor stores recent sensor history locally. Review changes in temperatures, utilization, memory usage, and other values over time when troubleshooting crashes, thermal issues, or unusual performance.
 
-This is especially useful when troubleshooting crashes, thermal issues, or unusual performance.
-
-### 🚨 Catch problems and investigate them
+### Alerts and diagnostics
 
 Configure alerts for individual sensors and review diagnostic information when something looks wrong.
 
-The app can also surface relevant Windows diagnostic events, helping connect sensor behavior with crashes or hardware and driver problems.
+The app also shows relevant Windows diagnostic events so you can compare sensor behavior with crashes or hardware and driver problems.
 
 <p align="center">
   <img src="assets/screenshots/alerts-and-diagnostics.jpg" width="46%" alt="Alerts and diagnostics">
 </p>
 
-### 🖼️ Export graphs for troubleshooting
+### Export graphs for troubleshooting
 
-Historical graphs can be exported as clean, shareable images, making it easier to send monitoring data to someone else when asking for help.
+Export historical graphs as images to share monitoring data when asking for help.
 
 <p align="center">
   <img src="assets/screenshots/graph-export-preview.jpg" width="46%" alt="Exported monitoring graph">
 </p>
 
-## Runs quietly in the background
+## Background monitoring
 
-The Windows component runs as a lightweight service and continues collecting data without requiring the Android app to stay connected.
+The Windows component runs as a background service and continues collecting data when the Android app is disconnected.
 
-A small notification-area companion gives quick access to setup and service controls.
+A notification-area companion provides access to setup and service controls.
 
 <p align="center">
   <img src="assets/screenshots/tray-application-menu.png" width="311" alt="LAN PC Monitor Windows tray menu">
 </p>
 
-## Local-first by design
+## Local network communication
 
-LAN PC Monitor is built around direct communication between your Windows PC and Android device.
+Your Windows PC and Android device communicate directly over the local network.
 
 Monitoring, pairing, live dashboards, and history synchronization stay on your local network. No account is required, and the project does not collect telemetry.
 
-The optional critical-notification feature is the exception: when enabled, a small bounded alert is sent through the notification relay and Firebase Cloud Messaging so notifications can reach the phone when needed.
+Optional critical notifications use the internet. When enabled, the service sends a size-limited alert through the notification relay and Firebase Cloud Messaging to reach your phone.
 
 ## Install and connect
 
@@ -167,7 +165,7 @@ The exact sensor set depends on the PC's hardware, drivers, permissions, and [Li
 |---|---|
 | Windows service | Reads hardware sensors, records history, evaluates alerts, and exposes the LAN API. |
 | Android app | Displays live readings, dashboards, alerts, diagnostics, and synchronized offline history. |
-| Tray companion | Opens the pairing page and provides quick access to service and notification controls. |
+| Tray companion | Opens the pairing page and provides access to service and notification controls. |
 | Notification relay | Forwards opt-in critical alerts to Firebase; it cannot connect to the PC and stores no alert history. |
 
 ### Privacy
@@ -176,9 +174,9 @@ Monitoring, pairing, live dashboards, and history synchronization stay on the lo
 
 There is no telemetry. Monitoring data is stored under `%ProgramData%\LanPcMonitor` on the PC, while the app keeps synchronized history and preferences in its private local database.
 
-Process monitoring retains only normalized process names such as `game.exe` and aggregate CPU statistics during detected load sessions—never paths, command lines, window titles, documents, memory contents, or network activity.
+During detected load sessions, process monitoring retains only normalized process names such as `game.exe` and aggregate CPU statistics. It does not retain paths, command lines, window titles, documents, memory contents, or network activity.
 
-Push notifications are the only feature that uses an internet service. After you opt in from **Settings**, the Windows service sends a bounded alert to the hosted relay, which forwards it through Firebase Cloud Messaging. The relay cannot access or control the monitored PC and does not receive sensor history.
+Push notifications are the only feature that uses an internet service. After you enable them in **Settings**, the Windows service sends a size-limited alert to the hosted relay, which forwards it through Firebase Cloud Messaging. The relay cannot access or control the monitored PC and does not receive sensor history.
 
 Notifications can be disabled again from the app. See the [notification relay and privacy boundary](docs/NOTIFICATION_RELAY.md).
 
@@ -267,11 +265,11 @@ If you change the service port, update the firewall rule to match:
 .\scripts\install-firewall-rule.bat 5010
 ```
 
-Most users do not need to edit these values. Phone notification enrollment happens in the Android app under **Settings → Critical notifications**; no Firebase project or relay configuration is required.
+These settings usually do not need editing. Enable phone notifications in the Android app under **Settings → Critical notifications**; no Firebase project or relay configuration is required.
 
 ## Alpha limitations
 
-LAN PC Monitor is usable today, but it is still pre-release software. Expect rough edges and verify alerts and readings against your hardware before relying on them.
+LAN PC Monitor is available for use as pre-release software. Expect bugs, and verify alerts and readings against your hardware before relying on them.
 
 Current limitations include:
 
